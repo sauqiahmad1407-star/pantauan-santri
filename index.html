@@ -18,7 +18,7 @@
     <!-- Firebase SDK (Modular) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBay7zJ_G-qztsStW7PtjZMRVSPOowrvPw",
@@ -32,7 +32,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Fungsi Simpan Absen ke Firebase Cloud (Dengan Deteksi Waktu Otomatis)
+        // Fungsi Simpan Absen ke Firebase Cloud
         window.simpanKeFirebase = async function(namaSantri, statusKeterangan) {
             try {
                 await addDoc(collection(db, "riwayat_absensi"), {
@@ -83,6 +83,76 @@
             } catch (e) {
                 console.error("Gagal menyimpan data keuangan detail: ", e);
                 alert("Gagal menyimpan ke database keuangan.");
+            }
+        };
+
+        // Fungsi Mengambil Data Real-time dari Firebase saat Profil Santri Dibuka
+        window.muatDataSantriDariCloud = async function(namaSantri) {
+            const containerTahfidz = document.getElementById('container-tahfidz-santri');
+            const containerKeuangan = document.getElementById('container-keuangan-santri');
+            
+            containerTahfidz.innerHTML = `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">Memuat data dari Cloud...</div>`;
+            containerKeuangan.innerHTML = `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">Memuat arsip keuangan...</div>`;
+
+            try {
+                // 1. Ambil Data Tahfidz & Agenda Musrif
+                const qMusrif = query(collection(db, "catatan_musrif"), where("namaSantri", "==", namaSantri));
+                const snapshotMusrif = await getDocs(qMusrif);
+                
+                if (!snapshotMusrif.empty) {
+                    let htmlMusrif = "";
+                    snapshotMusrif.forEach((doc) => {
+                        const data = doc.data();
+                        htmlMusrif += `
+                            <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] space-y-1">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-xs text-primary-brown"><i class="fa-solid fa-book-quran mr-1"></i> ${data.surat} (${data.ayat})</span>
+                                    <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">${data.status}</span>
+                                </div>
+                                <p class="text-[11px] text-gray-600"><b>Agenda:</b> ${data.agenda || '-'}</p>
+                                <span class="block text-[9px] text-gray-400 text-right">Diperbarui: ${data.waktuUpdate}</span>
+                            </div>
+                        `;
+                    });
+                    containerTahfidz.innerHTML = htmlMusrif;
+                } else {
+                    containerTahfidz.innerHTML = `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">Belum ada catatan tahfidz atau agenda untuk santri ini.</div>`;
+                }
+
+                // 2. Ambil Data Keuangan / SPP / Gedung / Buku / Baju (Arsip 3 Tahun)
+                const qKeuangan = query(collection(db, "catatan_keuangan_detail"), where("namaSantri", "==", namaSantri));
+                const snapshotKeuangan = await getDocs(qKeuangan);
+
+                if (!snapshotKeuangan.empty) {
+                    let htmlKeuangan = "";
+                    snapshotKeuangan.forEach((doc) => {
+                        const data = doc.data();
+                        const isLunas = data.status === "Lunas";
+                        const bgClass = isLunas ? "bg-emerald-50 border-emerald-200 text-emerald-900" : "bg-rose-50 border-rose-200 text-rose-900";
+                        const badgeClass = isLunas ? "bg-emerald-200 text-emerald-900" : "bg-rose-200 text-rose-900";
+                        const iconStatus = isLunas ? '<i class="fa-solid fa-check mr-1"></i> LUNAS' : '<i class="fa-solid fa-triangle-exclamation mr-1"></i> BELUM LUNAS (MENUNGGAK)';
+
+                        htmlKeuangan += `
+                            <div class="p-3 border rounded-xl flex justify-between items-center ${bgClass}">
+                                <div>
+                                    <span class="font-bold text-xs block">${data.jenisPos} • ${data.bulan} ${data.tahun}</span>
+                                    <span class="text-[11px] opacity-80">Nominal: Rp ${Number(data.nominal).toLocaleString('id-ID')}</span>
+                                </div>
+                                <span class="text-[10px] font-bold px-2.5 py-1 rounded-lg ${badgeClass}">
+                                    ${iconStatus}
+                                </span>
+                            </div>
+                        `;
+                    });
+                    containerKeuangan.innerHTML = htmlKeuangan;
+                } else {
+                    containerKeuangan.innerHTML = `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">Belum ada catatan keuangan / arsip pembayaran.</div>`;
+                }
+
+            } catch (e) {
+                console.error("Gagal mengambil data dari cloud: ", e);
+                containerTahfidz.innerHTML = `<div class="p-3 bg-rose-50 text-rose-700 rounded-xl text-center text-xs">Gagal memuat data dari database.</div>`;
+                containerKeuangan.innerHTML = `<div class="p-3 bg-rose-50 text-rose-700 rounded-xl text-center text-xs">Gagal memuat data keuangan.</div>`;
             }
         };
     </script>
@@ -187,7 +257,7 @@
             </div>
         </section>
 
-        <!-- 2. MENU SANTRI & REKAP (BERSIH & OTOMATIS BERDASARKAN WAKTU HP) -->
+        <!-- 2. MENU SANTRI & REKAP (DINAMIS MENARIK DATA DARI FIREBASE) -->
         <section id="menu-santri" class="space-y-6 hidden">
             <div id="santri-list-view" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-cream pb-3">
@@ -251,29 +321,23 @@
                     </span>
                 </div>
 
-                <!-- Arsip Keuangan & Tunggakan 3 Tahun (Indikator Hijau / Merah) -->
+                <!-- Arsip Keuangan & Tunggakan 3 Tahun (Ditarik dari Firebase) -->
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center justify-between">
                         <span><i class="fa-solid fa-wallet mr-1"></i> Riwayat Keuangan & SPP (Arsip 3 Tahun)</span>
-                        <span class="text-[10px] font-normal text-gray-500">Terisi otomatis dari input bendahara</span>
+                        <span class="text-[10px] font-normal text-gray-500">Live dari Cloud Database</span>
                     </h4>
-
                     <div id="container-keuangan-santri" class="space-y-2">
-                        <!-- Data akan terisi dinamis atau menampilkan status kosong (-) jika belum ada data -->
-                        <div class="p-3 bg-soft-cream border border-[#E3D5C9] rounded-xl text-center text-xs text-gray-500">
-                            Belum ada catatan keuangan yang diinput oleh bendahara.
-                        </div>
+                        <!-- Data masuk otomatis lewat JS -->
                     </div>
                 </div>
 
-                <!-- 1. Pemantauan Sholat 5 Waktu Berjamaah (Otomatis Berdasarkan Jam HP) -->
+                <!-- 1. Pemantauan Sholat 5 Waktu Berjamaah (Otomatis Jam HP) -->
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
                         <i class="fa-solid fa-kaaba"></i> Pemantauan Sholat 5 Waktu Berjamaah (Auto-Time)
                     </h4>
-                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center" id="sholat-status-grid">
-                        <!-- Diisi otomatis via JavaScript berdasarkan jam perangkat saat ini -->
-                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center" id="sholat-status-grid"></div>
                 </div>
 
                 <!-- 2. Sholat Sunnah & Amalan Harian -->
@@ -293,15 +357,13 @@
                     </div>
                 </div>
 
-                <!-- 3. Aktivitas Harian, Tahfidz & Ekstrakurikuler -->
+                <!-- 3. Aktivitas Harian, Tahfidz & Ekstrakurikuler (Ditarik dari Firebase) -->
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
                         <i class="fa-solid fa-book-open-reader"></i> Aktivitas, Tahfidz & Ekstrakurikuler
                     </h4>
                     <div id="container-tahfidz-santri" class="space-y-2">
-                        <div class="p-3 bg-soft-cream border border-[#E3D5C9] rounded-xl text-center text-xs text-gray-500">
-                            Belum ada setoran tahfidz atau agenda musrif yang diinput.
-                        </div>
+                        <!-- Data masuk otomatis lewat JS -->
                     </div>
                 </div>
             </div>
@@ -338,10 +400,8 @@
             </div>
         </section>
 
-        <!-- 4. MENU PANEL PENGURUS (MULTI-ROLE: MUSRIF & BENDAHARA RINCIAN 3 TAHUN) -->
+        <!-- 4. MENU PANEL PENGURUS -->
         <section id="menu-keterangan" class="space-y-6 hidden">
-            
-            <!-- Tombol Pilih Peran Login -->
             <div id="role-select-box" class="bg-white rounded-2xl p-6 border border-cream shadow-sm space-y-4 max-w-md mx-auto text-center">
                 <div class="w-12 h-12 bg-primary-brown text-white rounded-full flex items-center justify-center mx-auto text-lg font-bold">
                     <i class="fa-solid fa-shield-halved"></i>
@@ -360,7 +420,6 @@
                 </div>
             </div>
 
-            <!-- Kotak Input PIN -->
             <div id="pin-login-box" class="bg-white rounded-2xl p-6 border border-cream shadow-sm space-y-4 max-w-md mx-auto text-center hidden">
                 <div class="w-12 h-12 bg-amber-100 text-amber-800 rounded-full flex items-center justify-center mx-auto text-lg font-bold">
                     <i class="fa-solid fa-lock"></i>
@@ -378,7 +437,7 @@
                 </div>
             </div>
 
-            <!-- Panel Form Khusus Musrif Tahfidz -->
+            <!-- Panel Form Musrif -->
             <div id="musrif-form-box" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4 hidden">
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <div>
@@ -427,7 +486,7 @@
                 </div>
             </div>
 
-            <!-- Panel Form Bendahara Detil -->
+            <!-- Panel Form Bendahara -->
             <div id="bendahara-form-box" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4 hidden">
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <div>
@@ -503,7 +562,6 @@
                     </button>
                 </div>
             </div>
-
         </section>
 
     </main>
@@ -565,19 +623,12 @@
             }
         }
 
-        // Render Logika Otomatis Berdasarkan Jam HP untuk Sholat 5 Waktu
+        // Render Otomatis Sholat Berdasarkan Jam HP
         function renderStatusSholatOtomatis() {
             const now = new Date();
             const jam = now.getHours();
             const menit = now.getMinutes();
             const totalMenit = jam * 60 + menit;
-
-            // Batas Waktu Jadwal Sholat Berjamaah (dalam menit)
-            // Subuh: 04.00 - 06.00 (240 - 360)
-            // Dzuhur: 11.30 - 14.00 (690 - 840)
-            // Ashar: 15.00 - 17.30 (900 - 1050)
-            // Maghrib: 18.00 - 19.00 (1080 - 1140)
-            // Isya: 19.00 - 21.00 (1140 - 1260)
 
             const daftarSholat = [
                 { nama: "Subuh", start: 240, end: 360 },
@@ -590,15 +641,11 @@
             let html = "";
             daftarSholat.forEach(s => {
                 let statusBadge = "";
-                
                 if (totalMenit > s.end) {
-                    // Waktu sudah lewat tapi belum diabsen -> SILANG (Merah)
                     statusBadge = `<span class="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded-lg block"><i class="fa-solid fa-xmark mr-1"></i> Alfa / Terlewat</span>`;
                 } else if (totalMenit >= s.start && totalMenit <= s.end) {
-                    // Sedang berlangsung / Waktu Absen -> Belum Absen (Kuning / Menunggu)
                     statusBadge = `<span class="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg block"><i class="fa-solid fa-clock mr-1"></i> Belum Absen</span>`;
                 } else {
-                    // Waktu belum tiba (di masa depan) -> KOSONG (-)
                     statusBadge = `<span class="text-xs font-bold text-gray-400 bg-gray-50 border border-gray-200 px-2 py-1 rounded-lg block">- (Belum Waktunya)</span>`;
                 }
 
@@ -623,8 +670,12 @@
             const now = new Date();
             document.getElementById('current-timestamp').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }) + ", " + now.toLocaleTimeString('id-ID') + " WIB";
 
-            // Jalankan pengecekan status sholat otomatis berdasarkan jam perangkat
             renderStatusSholatOtomatis();
+
+            // PANGGIL FUNGSI UNTUK MENARIK DATA TAHFIDZ & KEUANGAN DARI FIREBASE CLOUD
+            if (window.muatDataSantriDariCloud) {
+                window.muatDataSantriDariCloud(nama);
+            }
         }
 
         function closeDetailSantri() {
