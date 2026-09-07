@@ -13,27 +13,52 @@
     <!-- Library QR Code Scanner (Html5-QRCode) -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     
+    <!-- Firebase SDK (Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Konfigurasi Firebase dari Proyek Anda
+        const firebaseConfig = {
+            apiKey: "AIzaSyBay7zJ_G-qztsStW7PtjZMRVSPOowrvPw",
+            authDomain: "absensi-pesantren-84f67.firebaseapp.com",
+            projectId: "absensi-pesantren-84f67",
+            storageBucket: "absensi-pesantren-84f67.firebasestorage.app",
+            messagingSenderId: "242253094687",
+            appId: "1:242253094687:web:5af5394c50f58911641a2a"
+        };
+
+        // Inisialisasi Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        window.db = db; // Agar bisa dipanggil fungsi global
+
+        // Fungsi Simpan Absen ke Firebase Saat Scan QR Berhasil
+        window.simpanKeFirebase = async function(namaSantri, statusKeterangan) {
+            try {
+                await addDoc(collection(db, "riwayat_absensi"), {
+                    nama: namaSantri,
+                    status: statusKeterangan,
+                    waktuServer: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+                    timestamp: Date.now()
+                });
+                console.log("Absensi berhasil disimpan ke Cloud Database!");
+            } catch (e) {
+                console.error("Gagal menyimpan ke database: ", e);
+            }
+        };
+    </script>
+
     <style>
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: #FDFBF7; /* Krem Sangat Lembut */
+            background-color: #FDFBF7;
             color: #2D2424;
         }
-        /* Kustom Scrollbar Ringan & Estetik */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #F5EFEB;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #C8B6A6;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #A39171;
-        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #F5EFEB; }
+        ::-webkit-scrollbar-thumb { background: #C8B6A6; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #A39171; }
         .bg-primary-brown { background-color: #5C4033; }
         .text-primary-brown { color: #5C4033; }
         .bg-soft-cream { background-color: #F5EFEB; }
@@ -54,7 +79,6 @@
                     <p class="text-xs text-[#E3D5C9]">Sistem Pemantauan & Absensi Terpadu</p>
                 </div>
             </div>
-            <!-- Waktu Sistem Real-time -->
             <div class="hidden sm:flex items-center space-x-2 bg-[#7D5A50] px-3 py-1.5 rounded-full text-xs">
                 <i class="fa-solid fa-clock text-[#E3D5C9]"></i>
                 <span id="realtime-clock" class="font-medium text-white">Senin, 7 Sep 2026</span>
@@ -65,21 +89,19 @@
     <!-- KONTEN UTAMA -->
     <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-6 mb-20 overflow-y-auto">
         
-        <!-- ================= 1. MENU HOME ================= -->
+        <!-- 1. MENU HOME -->
         <section id="menu-home" class="space-y-6">
-            <!-- Banner Sambutan -->
             <div class="bg-gradient-to-r from-[#5C4033] to-[#8C6D62] text-white p-6 rounded-2xl shadow-sm relative overflow-hidden">
                 <div class="relative z-10">
                     <span class="bg-[#E3D5C9] text-primary-brown text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider">Tahun Ajaran 2026/2027</span>
                     <h2 class="text-xl md:text-2xl font-bold mt-2">Ahlan wa Sahlan, Wali Santri & Pengurus</h2>
-                    <p class="text-xs md:text-sm text-[#F5EFEB] mt-1 max-w-lg">Portal digital pemantauan kegiatan harian santri, kehadiran sekolah, sholat berjamaah, hingga informasi pendaftaran santri baru (SPMB).</p>
+                    <p class="text-xs md:text-sm text-[#F5EFEB] mt-1 max-w-lg">Portal digital pemantauan kegiatan harian santri, kehadiran sekolah, sholat berjamaah, terhubung secara real-time dengan database cloud.</p>
                 </div>
                 <div class="absolute -right-4 -bottom-4 text-white/10 text-9xl">
                     <i class="fa-solid fa-quran"></i>
                 </div>
             </div>
 
-            <!-- Ringkasan Statistik -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div class="bg-white p-4 rounded-xl border border-cream shadow-sm">
                     <div class="text-emerald-600 text-sm font-semibold mb-1"><i class="fa-solid fa-users"></i> Total Santri</div>
@@ -92,14 +114,14 @@
                     <p class="text-[10px] text-gray-500 mt-1">Disiplin Tinggi</p>
                 </div>
                 <div class="bg-white p-4 rounded-xl border border-cream shadow-sm">
-                    <div class="text-blue-600 text-sm font-semibold mb-1"><i class="fa-solid fa-kaaba"></i> Sholat Berjamaah</div>
-                    <div class="text-lg font-bold text-[#2D2424]">Terverifikasi</div>
-                    <p class="text-[10px] text-gray-500 mt-1">Oleh Musyrif Masjid</p>
+                    <div class="text-blue-600 text-sm font-semibold mb-1"><i class="fa-solid fa-database"></i> Database Cloud</div>
+                    <div class="text-lg font-bold text-emerald-600">Terhubung</div>
+                    <p class="text-[10px] text-gray-500 mt-1">Firebase Firestore Aktif</p>
                 </div>
                 <div class="bg-white p-4 rounded-xl border border-cream shadow-sm">
                     <div class="text-purple-600 text-sm font-semibold mb-1"><i class="fa-solid fa-qrcode"></i> Sistem QR</div>
-                    <div class="text-lg font-bold text-emerald-600">Aktif</div>
-                    <p class="text-[10px] text-gray-500 mt-1">Scan Cepat Siap</p>
+                    <div class="text-lg font-bold text-emerald-600">Ready</div>
+                    <p class="text-[10px] text-gray-500 mt-1">Scan Otomatis Siap</p>
                 </div>
             </div>
 
@@ -121,27 +143,14 @@
                         <div>
                             <h4 class="font-semibold text-sm text-[#2D2424]">Pendaftaran SPMB Tahun Ajaran 2027/2028 Resmi Dibuka</h4>
                             <p class="text-xs text-gray-600 mt-1">Pesantren Al-Barokah membuka pendaftaran gelombang pertama. Tersedia potongan khusus bagi pendaftar jalur prestasi tahfidz.</p>
-                            <span class="inline-block mt-2 text-[10px] bg-primary-brown text-white px-2 py-0.5 rounded">Brosur SPMB Tersedia</span>
-                        </div>
-                    </div>
-
-                    <div class="p-4 bg-soft-cream rounded-xl border border-[#E3D5C9] flex gap-3 items-start">
-                        <div class="bg-[#8C6D62] text-white p-2.5 rounded-lg text-center min-w-[50px]">
-                            <span class="block text-xs font-semibold">SEP</span>
-                            <span class="block text-base font-bold">20</span>
-                        </div>
-                        <div>
-                            <h4 class="font-semibold text-sm text-[#2D2424]">Ujian Tengah Semester (UTS) Ganjil</h4>
-                            <p class="text-xs text-gray-600 mt-1">Pelaksanaan UTS tingkat MTs dan MA akan dimulai serentak. Diharapkan seluruh santri melengkapi persyaratan administrasi.</p>
                         </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- ================= 2. MENU SANTRI & REKAP ================= -->
+        <!-- 2. MENU SANTRI & REKAP -->
         <section id="menu-santri" class="space-y-6 hidden">
-            <!-- List View -->
             <div id="santri-list-view" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-cream pb-3">
                     <div>
@@ -150,14 +159,12 @@
                         </h3>
                         <p class="text-xs text-gray-600 mt-0.5">Pilih santri untuk melihat rekapitulasi sekolah, sholat, dan kegiatan harian.</p>
                     </div>
-                    <!-- Pencarian Nama -->
                     <div class="w-full sm:w-auto">
                         <input type="text" id="search-santri" onkeyup="filterSantri()" placeholder="Cari nama atau kelas..." class="w-full sm:w-64 text-xs px-3 py-2 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
                     </div>
                 </div>
 
                 <div id="list-santri-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <!-- Kartu Santri 1 -->
                     <div onclick="openDetailSantri('Ahmad Fauzan', 'X (Sepuluh) - A', 'NISN: 0089234112', 'Asrama Umar bin Khattab')" class="santri-card p-4 bg-soft-cream rounded-xl border border-[#E3D5C9] cursor-pointer hover:border-primary-brown transition-all">
                         <div class="flex justify-between items-start">
                             <div class="flex items-center gap-3">
@@ -169,13 +176,8 @@
                             </div>
                             <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">Aktif</span>
                         </div>
-                        <div class="mt-3 pt-2 border-t border-[#E3D5C9] flex justify-between text-[10px] text-gray-500">
-                            <span>Absen Hari Ini: <strong class="text-emerald-700">Hadir</strong></span>
-                            <span><i class="fa-solid fa-clock"></i> 07:15 WIB</span>
-                        </div>
                     </div>
 
-                    <!-- Kartu Santri 2 -->
                     <div onclick="openDetailSantri('Muhammad Alwi', 'XI (Sebelas) - B', 'NISN: 0078129341', 'Asrama Utsman bin Affan')" class="santri-card p-4 bg-soft-cream rounded-xl border border-[#E3D5C9] cursor-pointer hover:border-primary-brown transition-all">
                         <div class="flex justify-between items-start">
                             <div class="flex items-center gap-3">
@@ -187,51 +189,11 @@
                             </div>
                             <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">Aktif</span>
                         </div>
-                        <div class="mt-3 pt-2 border-t border-[#E3D5C9] flex justify-between text-[10px] text-gray-500">
-                            <span>Absen Hari Ini: <strong class="text-emerald-700">Hadir</strong></span>
-                            <span><i class="fa-solid fa-clock"></i> 07:05 WIB</span>
-                        </div>
-                    </div>
-
-                    <!-- Kartu Santri 3 -->
-                    <div onclick="openDetailSantri('Zaidan Al-Faruq', 'XII (Duabelas) - C', 'NISN: 0065412983', 'Asrama Ali bin Abi Thalib')" class="santri-card p-4 bg-soft-cream rounded-xl border border-[#E3D5C9] cursor-pointer hover:border-primary-brown transition-all">
-                        <div class="flex justify-between items-start">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-full bg-primary-brown text-white flex items-center justify-center font-bold text-sm">ZA</div>
-                                <div>
-                                    <h4 class="font-bold text-sm text-[#2D2424]">Zaidan Al-Faruq</h4>
-                                    <p class="text-[11px] text-gray-600">Kelas XII-C • Asrama Ali</p>
-                                </div>
-                            </div>
-                            <span class="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-semibold">Izin Lomba</span>
-                        </div>
-                        <div class="mt-3 pt-2 border-t border-[#E3D5C9] flex justify-between text-[10px] text-gray-500">
-                            <span>Absen Hari Ini: <strong class="text-amber-700">Izin Disposisi</strong></span>
-                            <span><i class="fa-solid fa-clock"></i> 08:00 WIB</span>
-                        </div>
-                    </div>
-
-                    <!-- Kartu Santri 4 -->
-                    <div onclick="openDetailSantri('Fikri Haikal', 'X (Sepuluh) - B', 'NISN: 0083921045', 'Asrama Umar bin Khattab')" class="santri-card p-4 bg-soft-cream rounded-xl border border-[#E3D5C9] cursor-pointer hover:border-primary-brown transition-all">
-                        <div class="flex justify-between items-start">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-full bg-[#8C6D62] text-white flex items-center justify-center font-bold text-sm">FH</div>
-                                <div>
-                                    <h4 class="font-bold text-sm text-[#2D2424]">Fikri Haikal</h4>
-                                    <p class="text-[11px] text-gray-600">Kelas X-B • Asrama Umar</p>
-                                </div>
-                            </div>
-                            <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">Aktif</span>
-                        </div>
-                        <div class="mt-3 pt-2 border-t border-[#E3D5C9] flex justify-between text-[10px] text-gray-500">
-                            <span>Absen Hari Ini: <strong class="text-emerald-700">Hadir</strong></span>
-                            <span><i class="fa-solid fa-clock"></i> 06:50 WIB</span>
-                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Detail View (Hidden Default) -->
+            <!-- Detail View -->
             <div id="santri-detail-view" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-5 hidden">
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <button onclick="closeDetailSantri()" class="text-xs bg-soft-cream text-primary-brown px-3 py-1.5 rounded-lg font-semibold hover:bg-[#E3D5C9]">
@@ -240,105 +202,27 @@
                     <span class="text-xs text-gray-500"><i class="fa-solid fa-clock-rotate-left mr-1"></i> Terakhir Diperbarui: <span id="current-timestamp">Hari ini</span></span>
                 </div>
 
-                <div class="bg-soft-cream p-4 rounded-xl border border-[#E3D5C9] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div class="bg-soft-cream p-4 rounded-xl border border-[#E3D5C9] flex justify-between items-center">
                     <div>
                         <span id="det-nisn" class="text-[10px] uppercase font-bold tracking-wider text-amber-800 bg-amber-100 px-2 py-0.5 rounded">NISN: -</span>
                         <h2 id="det-nama" class="text-lg font-bold text-primary-brown mt-1">Nama Santri</h2>
                         <p id="det-info" class="text-xs text-gray-600">Kelas & Asrama</p>
                     </div>
                     <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                        <i class="fa-solid fa-circle text-[8px]"></i> Terverifikasi Sistem
+                        <i class="fa-solid fa-circle text-[8px]"></i> Terverifikasi Cloud
                     </span>
-                </div>
-
-                <!-- Kehadiran Sekolah -->
-                <div class="space-y-3">
-                    <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-school"></i> Rekap Kehadiran Sekolah & Jadwal
-                    </h4>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs">
-                            <thead class="bg-soft-cream text-primary-brown uppercase text-[10px]">
-                                <tr>
-                                    <th class="p-2.5 rounded-l-lg">Jam</th>
-                                    <th class="p-2.5">Mata Pelajaran</th>
-                                    <th class="p-2.5">Waktu Catat</th>
-                                    <th class="p-2.5 rounded-r-lg text-center">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-[#F5EFEB]">
-                                <tr>
-                                    <td class="p-2.5 font-semibold text-gray-600">07:30 - 09:00</td>
-                                    <td class="p-2.5 font-medium text-[#2D2424]">Nahwu & Shorof (Lanjutan)</td>
-                                    <td class="p-2.5 text-gray-500">07:15:20 WIB</td>
-                                    <td class="p-2.5 text-center"><span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-semibold">Mengikuti</span></td>
-                                </tr>
-                                <tr>
-                                    <td class="p-2.5 font-semibold text-gray-600">09:15 - 10:45</td>
-                                    <td class="p-2.5 font-medium text-[#2D2424]">Fiqh Ibadah & Muamalah</td>
-                                    <td class="p-2.5 text-gray-500">09:10:05 WIB</td>
-                                    <td class="p-2.5 text-center"><span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-semibold">Mengikuti</span></td>
-                                </tr>
-                                <tr>
-                                    <td class="p-2.5 font-semibold text-gray-600">13:00 - 14:30</td>
-                                    <td class="p-2.5 font-medium text-[#2D2424]">Ilmu Hadits (Arba'in)</td>
-                                    <td class="p-2.5 text-gray-500">12:55:00 WIB</td>
-                                    <td class="p-2.5 text-center"><span class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded font-semibold">Izin Lomba</span></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Sholat Wajib -->
-                <div class="space-y-3">
-                    <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-kaaba"></i> Pemantauan Sholat Wajib & Sunnah
-                    </h4>
-                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
-                        <div class="p-2.5 bg-soft-cream rounded-xl border border-[#E3D5C9]">
-                            <span class="text-[10px] font-bold text-gray-500 block">SUBUH</span>
-                            <span class="text-emerald-600 text-xs font-bold"><i class="fa-solid fa-circle-check"></i> Berjamaah</span>
-                            <span class="block text-[9px] text-gray-400 mt-1">04:35 WIB</span>
-                        </div>
-                        <div class="p-2.5 bg-soft-cream rounded-xl border border-[#E3D5C9]">
-                            <span class="text-[10px] font-bold text-gray-500 block">DZUHUR</span>
-                            <span class="text-emerald-600 text-xs font-bold"><i class="fa-solid fa-circle-check"></i> Berjamaah</span>
-                            <span class="block text-[9px] text-gray-400 mt-1">12:10 WIB</span>
-                        </div>
-                        <div class="p-2.5 bg-soft-cream rounded-xl border border-[#E3D5C9]">
-                            <span class="text-[10px] font-bold text-gray-500 block">ASHAR</span>
-                            <span class="text-emerald-600 text-xs font-bold"><i class="fa-solid fa-circle-check"></i> Berjamaah</span>
-                            <span class="block text-[9px] text-gray-400 mt-1">15:25 WIB</span>
-                        </div>
-                        <div class="p-2.5 bg-soft-cream rounded-xl border border-[#E3D5C9]">
-                            <span class="text-[10px] font-bold text-gray-500 block">MAGHRIB</span>
-                            <span class="text-emerald-600 text-xs font-bold"><i class="fa-solid fa-circle-check"></i> Berjamaah</span>
-                            <span class="block text-[9px] text-gray-400 mt-1">18:05 WIB</span>
-                        </div>
-                        <div class="p-2.5 bg-soft-cream rounded-xl border border-[#E3D5C9]">
-                            <span class="text-[10px] font-bold text-gray-500 block">ISYA</span>
-                            <span class="text-emerald-600 text-xs font-bold"><i class="fa-solid fa-circle-check"></i> Berjamaah</span>
-                            <span class="block text-[9px] text-gray-400 mt-1">19:20 WIB</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Catatan Musyrif -->
-                <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] text-xs text-gray-700">
-                    <p><strong>Catatan Musyrif Asrama:</strong> Hafalan Al-Quran lancar, rajin melaksanakan sholat sunnah Dhuha dan Tahajud.</p>
                 </div>
             </div>
         </section>
 
-        <!-- ================= 3. MENU SCAN QR ABSENSI ================= -->
+        <!-- 3. MENU SCAN QR ABSENSI -->
         <section id="menu-scan" class="space-y-6 hidden">
             <div class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4 text-center">
                 <div class="border-b border-cream pb-3 text-left">
                     <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-qrcode"></i> Scan QR Code Absensi Otomatis
+                        <i class="fa-solid fa-qrcode"></i> Scan QR Code Absensi Cloud
                     </h3>
-                    <p class="text-xs text-gray-600 mt-0.5">Arahkan kamera perangkat ke Kartu Tanda Santri (KTS) untuk mencatat kehadiran secara instan.</p>
+                    <p class="text-xs text-gray-600 mt-0.5">Arahkan kamera ke Kartu Tanda Santri untuk mengirim data langsung ke database cloud.</p>
                 </div>
 
                 <div class="py-3">
@@ -350,13 +234,11 @@
                     </button>
                 </div>
 
-                <!-- Area Tampilan Kamera -->
                 <div id="reader" class="w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-cream hidden"></div>
 
-                <!-- Hasil Scan Berhasil -->
                 <div id="qr-result-box" class="hidden p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-left space-y-1">
                     <div class="flex items-center gap-2 text-emerald-800 font-bold text-xs">
-                        <i class="fa-solid fa-circle-check text-sm"></i> Absensi Berhasil Tercatat Otomatis!
+                        <i class="fa-solid fa-circle-check text-sm"></i> Absensi Berhasil Disimpan ke Firebase!
                     </div>
                     <p id="qr-text-output" class="text-xs text-gray-700 font-medium"></p>
                     <p id="qr-timestamp" class="text-[10px] text-gray-500"></p>
@@ -364,48 +246,25 @@
             </div>
         </section>
 
-        <!-- ================= 4. MENU KETERANGAN & KEGIATAN ================= -->
+        <!-- 4. MENU KETERANGAN -->
         <section id="menu-keterangan" class="space-y-6 hidden">
             <div class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4">
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-calendar-days"></i> Kegiatan Pesantren & Ekstrakurikuler Lainnya
+                        <i class="fa-solid fa-calendar-days"></i> Kegiatan Pesantren & Ekstrakurikuler
                     </h3>
-                    <span class="text-xs text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full font-medium">Pengembangan Diri</span>
+                    <span class="text-xs text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full font-medium">Program Utama</span>
                 </div>
-                <p class="text-xs text-gray-600">Catatan program pembinaan karakter, bahasa, dan kedisiplinan santri di lingkungan asrama.</p>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div class="p-4 bg-soft-cream rounded-xl border border-[#E3D5C9]">
-                        <span class="font-bold text-xs text-primary-brown block">Setoran Tahfidz Al-Quran</span>
-                        <p class="text-xs text-gray-600 mt-1">Jadwal: Ba'da Subuh & Ba'da Ashar di Masjid Utama.</p>
-                        <span class="inline-block mt-2 text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">Wajib Asrama</span>
-                    </div>
-
-                    <div class="p-4 bg-soft-cream rounded-xl border border-[#E3D5C9]">
-                        <span class="font-bold text-xs text-primary-brown block">Kajian Kitab Kuning</span>
-                        <p class="text-xs text-gray-600 mt-1">Jadwal: Malam Senin & Malam Kamis bersama pengasuh.</p>
-                        <span class="inline-block mt-2 text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">Kitab Fathul Qarib</span>
-                    </div>
-
-                    <div class="p-4 bg-soft-cream rounded-xl border border-[#E3D5C9]">
-                        <span class="font-bold text-xs text-primary-brown block">Muhadharah (Pidato 3 Bahasa)</span>
-                        <p class="text-xs text-gray-600 mt-1">Jadwal: Malam Jumat (Praktik Bahasa Arab & Inggris).</p>
-                        <span class="inline-block mt-2 text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">Public Speaking</span>
-                    </div>
-
-                    <div class="p-4 bg-soft-cream rounded-xl border border-[#E3D5C9]">
-                        <span class="font-bold text-xs text-primary-brown block">Klub Bahtsul Masail (Diskusi Fiqh)</span>
-                        <p class="text-xs text-gray-600 mt-1">Jadwal: Sabtu Sore di Aula Utama Pesantren.</p>
-                        <span class="inline-block mt-2 text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">Kajian Kontemporer</span>
-                    </div>
+                <div class="p-4 bg-soft-cream rounded-xl border border-[#E3D5C9]">
+                    <span class="font-bold text-xs text-primary-brown block">Setoran Tahfidz Al-Quran</span>
+                    <p class="text-xs text-gray-600 mt-1">Jadwal: Ba'da Subuh & Ba'da Ashar di Masjid Utama.</p>
                 </div>
             </div>
         </section>
 
     </main>
 
-    <!-- BOTTOM NAVIGATION (NAVBAR BAWAH) -->
+    <!-- NAVBAR BAWAH -->
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-cream shadow-lg z-50">
         <div class="max-w-4xl mx-auto flex justify-around py-2 px-2">
             <button onclick="switchTab('home')" id="btn-home" class="nav-btn flex flex-col items-center flex-1 py-1 text-primary-brown transition-colors">
@@ -429,7 +288,6 @@
 
     <!-- JAVASCRIPT LOGIC -->
     <script>
-        // Navigasi Tab Utama
         function switchTab(tabName) {
             const tabs = ['home', 'santri', 'scan', 'keterangan'];
             tabs.forEach(t => {
@@ -450,31 +308,22 @@
             activeSpan.classList.remove('font-medium');
             activeSpan.classList.add('font-semibold');
 
-            // Hentikan kamera QR jika berpindah dari menu scan
             stopQrScanner();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Filter Pencarian Nama Santri
         function filterSantri() {
             let input = document.getElementById('search-santri').value.toLowerCase();
             let cards = document.getElementsByClassName('santri-card');
-            
             for (let i = 0; i < cards.length; i++) {
                 let text = cards[i].innerText.toLowerCase();
-                if (text.includes(input)) {
-                    cards[i].style.display = "";
-                } else {
-                    cards[i].style.display = "none";
-                }
+                cards[i].style.display = text.includes(input) ? "" : "none";
             }
         }
 
-        // Buka Rekap Detail Santri
         function openDetailSantri(nama, kelas, nisn, asrama) {
             document.getElementById('santri-list-view').classList.add('hidden');
             document.getElementById('santri-detail-view').classList.remove('hidden');
-            
             document.getElementById('det-nama').innerText = nama;
             document.getElementById('det-nisn').innerText = nisn + " • " + asrama;
             document.getElementById('det-info').innerText = "Kelas: " + kelas;
@@ -483,13 +332,11 @@
             document.getElementById('current-timestamp').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }) + ", " + now.toLocaleTimeString('id-ID') + " WIB";
         }
 
-        // Tutup Detail Santri
         function closeDetailSantri() {
             document.getElementById('santri-detail-view').classList.add('hidden');
             document.getElementById('santri-list-view').classList.remove('hidden');
         }
 
-        // QR Code Scanner Handler
         let html5QrCode;
         function startQrScanner() {
             const readerDiv = document.getElementById('reader');
@@ -505,16 +352,19 @@
                 (decodedText, decodedResult) => {
                     stopQrScanner();
                     document.getElementById('qr-result-box').classList.remove('hidden');
-                    document.getElementById('qr-text-output').innerText = "Data Santri Terdeteksi: " + decodedText;
+                    document.getElementById('qr-text-output').innerText = "Data Terdeteksi: " + decodedText;
                     
                     const now = new Date();
                     document.getElementById('qr-timestamp').innerText = "Waktu Tercatat: " + now.toLocaleDateString('id-ID') + " Pukul " + now.toLocaleTimeString('id-ID') + " WIB";
+
+                    // Kirim otomatis ke Firebase Database yang sudah kita buat
+                    if (window.simpanKeFirebase) {
+                        window.simpanKeFirebase(decodedText, "Hadir Tepat Waktu");
+                    }
                 },
-                (errorMessage) => {
-                    // Ignore minor scanning frame errors
-                }
+                (errorMessage) => {}
             ).catch((err) => {
-                alert("Tidak dapat mengakses kamera. Pastikan izin kamera browser telah diaktifkan.");
+                alert("Tidak dapat mengakses kamera. Pastikan izin kamera aktif.");
             });
         }
 
