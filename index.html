@@ -12,11 +12,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Library QR Code Scanner (Html5-QRCode) -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- Library QRCode Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <!-- Firebase SDK (Modular) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // Konfigurasi Firebase dari Proyek Anda
         const firebaseConfig = {
@@ -28,12 +30,10 @@
             appId: "1:242253094687:web:5af5394c50f58911641a2a"
         };
 
-        // Inisialisasi Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        window.db = db; // Agar bisa dipanggil fungsi global
 
-        // Fungsi Simpan Absen ke Firebase Saat Scan QR Berhasil
+        // Fungsi Simpan Absen ke Firebase Cloud
         window.simpanKeFirebase = async function(namaSantri, statusKeterangan) {
             try {
                 await addDoc(collection(db, "riwayat_absensi"), {
@@ -45,6 +45,45 @@
                 console.log("Absensi berhasil disimpan ke Cloud Database!");
             } catch (e) {
                 console.error("Gagal menyimpan ke database: ", e);
+            }
+        };
+
+        // Fungsi Simpan Update Tahfidz / Agenda Musrif ke Firebase Cloud
+        window.simpanTahfidzMusrif = async function(namaSantri, surat, ayat, statusHafalan, catatanAgenda) {
+            try {
+                await addDoc(collection(db, "catatan_musrif"), {
+                    namaSantri: namaSantri,
+                    surat: surat,
+                    ayat: ayat,
+                    status: statusHafalan,
+                    agenda: catatanAgenda,
+                    waktuUpdate: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+                    timestamp: Date.now()
+                });
+                alert("Berhasil! Data Tahfidz & Agenda Musrif tersimpan ke Cloud Firebase.");
+            } catch (e) {
+                console.error("Gagal menyimpan data musrif: ", e);
+                alert("Gagal menyimpan ke database.");
+            }
+        };
+
+        // Fungsi Simpan Data Keuangan Detail 3 Tahun oleh Bendahara ke Firebase Cloud
+        window.simpanKeuanganBendaharaDetail = async function(namaSantri, jenisPos, bulanTagih, tahunTagih, nominal, statusBayar) {
+            try {
+                await addDoc(collection(db, "catatan_keuangan_detail"), {
+                    namaSantri: namaSantri,
+                    jenisPos: jenisPos, // SPP / Gedung / Buku / Baju
+                    bulan: bulanTagih,
+                    tahun: tahunTagih,
+                    nominal: nominal,
+                    status: statusBayar, // Lunas / Belum Lunas
+                    waktuInput: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+                    timestamp: Date.now()
+                });
+                alert("Berhasil! Rincian keuangan 3 tahun tersimpan ke Cloud Firebase.");
+            } catch (e) {
+                console.error("Gagal menyimpan data keuangan detail: ", e);
+                alert("Gagal menyimpan ke database keuangan.");
             }
         };
     </script>
@@ -116,40 +155,40 @@
                 <div class="bg-white p-4 rounded-xl border border-cream shadow-sm">
                     <div class="text-blue-600 text-sm font-semibold mb-1"><i class="fa-solid fa-database"></i> Database Cloud</div>
                     <div class="text-lg font-bold text-emerald-600">Terhubung</div>
-                    <p class="text-[10px] text-gray-500 mt-1">Firebase Firestore Aktif</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Firebase Firestore</p>
                 </div>
                 <div class="bg-white p-4 rounded-xl border border-cream shadow-sm">
                     <div class="text-purple-600 text-sm font-semibold mb-1"><i class="fa-solid fa-qrcode"></i> Sistem QR</div>
-                    <div class="text-lg font-bold text-emerald-600">Ready</div>
-                    <p class="text-[10px] text-gray-500 mt-1">Scan Otomatis Siap</p>
+                    <div class="text-lg font-bold text-emerald-600">Auto-Time</div>
+                    <p class="text-[10px] text-gray-500 mt-1">Deteksi Jam Otomatis</p>
                 </div>
             </div>
 
-            <!-- Pengumuman & SPMB -->
+            <!-- Fitur Generator QR Santri di Beranda -->
             <div class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4">
-                <div class="flex justify-between items-center border-b border-cream pb-3">
+                <div class="border-b border-cream pb-3">
                     <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-bullhorn"></i> Pengumuman Pesantren & SPMB
+                        <i class="fa-solid fa-id-card"></i> Buat QR Code Kartu Santri Otomatis
                     </h3>
-                    <span class="text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full font-medium">Informasi Terbaru</span>
+                    <p class="text-xs text-gray-600 mt-0.5">Masukkan Nama dan NISN santri untuk mencetak QR Code unik absensi.</p>
                 </div>
-                
-                <div class="space-y-3">
-                    <div class="p-4 bg-soft-cream rounded-xl border border-[#E3D5C9] flex gap-3 items-start">
-                        <div class="bg-primary-brown text-white p-2.5 rounded-lg text-center min-w-[50px]">
-                            <span class="block text-xs font-semibold">SEP</span>
-                            <span class="block text-base font-bold">15</span>
-                        </div>
-                        <div>
-                            <h4 class="font-semibold text-sm text-[#2D2424]">Pendaftaran SPMB Tahun Ajaran 2027/2028 Resmi Dibuka</h4>
-                            <p class="text-xs text-gray-600 mt-1">Pesantren Al-Barokah membuka pendaftaran gelombang pertama. Tersedia potongan khusus bagi pendaftar jalur prestasi tahfidz.</p>
-                        </div>
-                    </div>
+
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="text" id="input-nama-santri" placeholder="Contoh: Ahmad Fauzan - 008923" class="flex-1 text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                    <button onclick="generateQRCode()" class="bg-primary-brown text-white text-xs px-5 py-2.5 rounded-xl font-semibold hover:bg-[#4A3228] transition-colors">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Buat QR Code
+                    </button>
+                </div>
+
+                <div id="qrcode-container" class="flex flex-col items-center justify-center p-4 bg-soft-cream rounded-xl border border-cream hidden">
+                    <p id="label-qr-nama" class="font-bold text-sm text-primary-brown mb-3 text-center"></p>
+                    <div id="qrcode" class="bg-white p-3 rounded-lg shadow-sm"></div>
+                    <p class="text-[10px] text-gray-500 mt-2 text-center">Scan QR ini menggunakan menu 'Scan Absen' untuk mencatat kehadiran otomatis.</p>
                 </div>
             </div>
         </section>
 
-        <!-- 2. MENU SANTRI & REKAP -->
+        <!-- 2. MENU SANTRI & REKAP LENGKAP DENGAN INDIKATOR KEUANGAN 3 TAHUN -->
         <section id="menu-santri" class="space-y-6 hidden">
             <div id="santri-list-view" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-cream pb-3">
@@ -157,7 +196,7 @@
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
                             <i class="fa-solid fa-address-book"></i> Daftar Rekapitulasi Santri
                         </h3>
-                        <p class="text-xs text-gray-600 mt-0.5">Pilih santri untuk melihat rekapitulasi sekolah, sholat, dan kegiatan harian.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">Pilih santri untuk melihat rekapitulasi sekolah, sholat, dan riwayat keuangan 3 tahun.</p>
                     </div>
                     <div class="w-full sm:w-auto">
                         <input type="text" id="search-santri" onkeyup="filterSantri()" placeholder="Cari nama atau kelas..." class="w-full sm:w-64 text-xs px-3 py-2 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
@@ -193,7 +232,7 @@
                 </div>
             </div>
 
-            <!-- Detail View -->
+            <!-- Detail View Lengkap + Indikator Merah/Hijau Keuangan 3 Tahun -->
             <div id="santri-detail-view" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-5 hidden">
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <button onclick="closeDetailSantri()" class="text-xs bg-soft-cream text-primary-brown px-3 py-1.5 rounded-lg font-semibold hover:bg-[#E3D5C9]">
@@ -212,6 +251,104 @@
                         <i class="fa-solid fa-circle text-[8px]"></i> Terverifikasi Cloud
                     </span>
                 </div>
+
+                <!-- RIWAYAT KEUANGAN & TUNGGAKAN 3 TAHUN (DENGAN TANDA HIJAU / MERAH) -->
+                <div class="space-y-3">
+                    <h4 class="font-bold text-sm text-primary-brown flex items-center justify-between">
+                        <span><i class="fa-solid fa-wallet mr-1"></i> Riwayat Keuangan & SPP (Arsip 3 Tahun)</span>
+                        <span class="text-[10px] font-normal text-gray-500">Menampilkan status lunas & tunggakan lalu</span>
+                    </h4>
+
+                    <div class="space-y-2">
+                        <!-- Contoh Arsip 2025 (Misal: Oktober 2025 Belum Lunas -> Merah) -->
+                        <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl flex justify-between items-center">
+                            <div>
+                                <span class="font-bold text-xs text-rose-900 block">SPP Bulanan Pesantren • Oktober 2025</span>
+                                <span class="text-[11px] text-rose-700">Nominal: Rp 350.000 (Arsip Tahun Ajaran 2025/2026)</span>
+                            </div>
+                            <span class="text-[10px] bg-rose-200 text-rose-900 font-bold px-2.5 py-1 rounded-lg">
+                                <i class="fa-solid fa-triangle-exclamation mr-1"></i> BELUM LUNAS (MENUNGGAK)
+                            </span>
+                        </div>
+
+                        <!-- Contoh Arsip 2026 (Misal: Agustus 2026 Lunas -> Hijau) -->
+                        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex justify-between items-center">
+                            <div>
+                                <span class="font-bold text-xs text-emerald-900 block">SPP Bulanan Pesantren • Agustus 2026</span>
+                                <span class="text-[11px] text-emerald-700">Nominal: Rp 350.000 • Pembayaran Buku & Baju Seragam</span>
+                            </div>
+                            <span class="text-[10px] bg-emerald-200 text-emerald-900 font-bold px-2.5 py-1 rounded-lg">
+                                <i class="fa-solid fa-check mr-1"></i> LUNAS (TERVERIFIKASI)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1. Rekap Kehadiran Sekolah -->
+                <div class="space-y-3">
+                    <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
+                        <i class="fa-solid fa-clipboard-user"></i> Rekapitulasi Kehadiran Sekolah
+                    </h4>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+                            <span class="block text-[10px] text-emerald-700 font-semibold">Hadir</span>
+                            <span class="text-base font-bold text-emerald-800">96 Hari</span>
+                        </div>
+                        <div class="bg-amber-50 p-3 rounded-xl border border-amber-200">
+                            <span class="block text-[10px] text-amber-700 font-semibold">Izin / Sakit</span>
+                            <span class="text-base font-bold text-amber-800">2 Hari</span>
+                        </div>
+                        <div class="bg-rose-50 p-3 rounded-xl border border-rose-200">
+                            <span class="block text-[10px] text-rose-700 font-semibold">Alpa</span>
+                            <span class="text-base font-bold text-rose-800">0 Hari</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Pemantauan Sholat 5 Waktu Berjamaah -->
+                <div class="space-y-3">
+                    <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
+                        <i class="fa-solid fa-kaaba"></i> Pemantauan Sholat 5 Waktu Berjamaah
+                    </h4>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                        <div class="bg-soft-cream p-2.5 rounded-xl border border-[#E3D5C9]">
+                            <span class="block text-[10px] text-gray-600 font-medium">Subuh</span>
+                            <span class="text-xs font-bold text-emerald-700"><i class="fa-solid fa-check mr-1"></i> Berjamaah</span>
+                        </div>
+                        <div class="bg-soft-cream p-2.5 rounded-xl border border-[#E3D5C9]">
+                            <span class="block text-[10px] text-gray-600 font-medium">Dzuhur</span>
+                            <span class="text-xs font-bold text-emerald-700"><i class="fa-solid fa-check mr-1"></i> Berjamaah</span>
+                        </div>
+                        <div class="bg-soft-cream p-2.5 rounded-xl border border-[#E3D5C9]">
+                            <span class="block text-[10px] text-gray-600 font-medium">Ashar</span>
+                            <span class="text-xs font-bold text-emerald-700"><i class="fa-solid fa-check mr-1"></i> Berjamaah</span>
+                        </div>
+                        <div class="bg-soft-cream p-2.5 rounded-xl border border-[#E3D5C9]">
+                            <span class="block text-[10px] text-gray-600 font-medium">Maghrib</span>
+                            <span class="text-xs font-bold text-emerald-700"><i class="fa-solid fa-check mr-1"></i> Berjamaah</span>
+                        </div>
+                        <div class="bg-soft-cream p-2.5 rounded-xl border border-[#E3D5C9]">
+                            <span class="block text-[10px] text-gray-600 font-medium">Isya</span>
+                            <span class="text-xs font-bold text-emerald-700"><i class="fa-solid fa-check mr-1"></i> Berjamaah</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Aktivitas Harian & Ekstrakurikuler -->
+                <div class="space-y-3">
+                    <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
+                        <i class="fa-solid fa-book-open-reader"></i> Aktivitas, Tahfidz & Ekstrakurikuler
+                    </h4>
+                    <div class="space-y-2">
+                        <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
+                            <div>
+                                <span class="font-bold text-xs text-primary-brown block">Setoran Tahfidz Al-Quran</span>
+                                <span class="text-[11px] text-gray-600">Surat An-Nazi'at • Juz 30</span>
+                            </div>
+                            <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-lg">Lancar (Mumtaz)</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -220,9 +357,9 @@
             <div class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4 text-center">
                 <div class="border-b border-cream pb-3 text-left">
                     <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-qrcode"></i> Scan QR Code Absensi Cloud
+                        <i class="fa-solid fa-qrcode"></i> Scan QR Code Absensi Cloud (Auto-Time)
                     </h3>
-                    <p class="text-xs text-gray-600 mt-0.5">Arahkan kamera ke Kartu Tanda Santri untuk mengirim data langsung ke database cloud.</p>
+                    <p class="text-xs text-gray-600 mt-0.5">Arahkan kamera ke Kartu Santri. Sistem mendeteksi waktu (Sekolah / Sholat) otomatis.</p>
                 </div>
 
                 <div class="py-3">
@@ -246,20 +383,172 @@
             </div>
         </section>
 
-        <!-- 4. MENU KETERANGAN -->
+        <!-- 4. MENU PANEL PENGURUS (MULTI-ROLE: MUSRIF & BENDAHARA RINCIAN 3 TAHUN) -->
         <section id="menu-keterangan" class="space-y-6 hidden">
-            <div class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4">
-                <div class="flex justify-between items-center border-b border-cream pb-3">
-                    <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-calendar-days"></i> Kegiatan Pesantren & Ekstrakurikuler
-                    </h3>
-                    <span class="text-xs text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full font-medium">Program Utama</span>
+            
+            <!-- Tombol Pilih Peran Login -->
+            <div id="role-select-box" class="bg-white rounded-2xl p-6 border border-cream shadow-sm space-y-4 max-w-md mx-auto text-center">
+                <div class="w-12 h-12 bg-primary-brown text-white rounded-full flex items-center justify-center mx-auto text-lg font-bold">
+                    <i class="fa-solid fa-shield-halved"></i>
                 </div>
-                <div class="p-4 bg-soft-cream rounded-xl border border-[#E3D5C9]">
-                    <span class="font-bold text-xs text-primary-brown block">Setoran Tahfidz Al-Quran</span>
-                    <p class="text-xs text-gray-600 mt-1">Jadwal: Ba'da Subuh & Ba'da Ashar di Masjid Utama.</p>
+                <div>
+                    <h3 class="font-bold text-base text-primary-brown">Portal Pengurus & Keuangan</h3>
+                    <p class="text-xs text-gray-600 mt-1">Silakan pilih peran login untuk mengakses panel manajemen.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-2 pt-2">
+                    <button onclick="pilihPeran('musrif')" class="p-3 bg-soft-cream border border-cream rounded-xl hover:border-primary-brown text-xs font-bold text-primary-brown transition-all">
+                        <i class="fa-solid fa-book-quran block text-lg mb-1"></i> Musrif Tahfidz
+                    </button>
+                    <button onclick="pilihPeran('bendahara')" class="p-3 bg-soft-cream border border-cream rounded-xl hover:border-primary-brown text-xs font-bold text-primary-brown transition-all">
+                        <i class="fa-solid wallet block text-lg mb-1"></i> Bendahara Detail
+                    </button>
                 </div>
             </div>
+
+            <!-- Kotak Input PIN -->
+            <div id="pin-login-box" class="bg-white rounded-2xl p-6 border border-cream shadow-sm space-y-4 max-w-md mx-auto text-center hidden">
+                <div class="w-12 h-12 bg-amber-100 text-amber-800 rounded-full flex items-center justify-center mx-auto text-lg font-bold">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <div>
+                    <h3 id="label-role-title" class="font-bold text-base text-primary-brown">Autentikasi PIN</h3>
+                    <p class="text-xs text-gray-600 mt-1">Masukkan PIN rahasia sesuai peran Anda.</p>
+                </div>
+                <div class="space-y-3">
+                    <input type="password" id="input-pin-role" placeholder="Masukkan PIN..." class="w-full text-center text-sm px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown tracking-widest">
+                    <div class="flex gap-2">
+                        <button onclick="kembaliKePilihPeran()" class="w-1/3 bg-gray-200 text-gray-700 text-xs font-bold py-2.5 rounded-xl hover:bg-gray-300">Kembali</button>
+                        <button onclick="verifikasiPinRole()" class="w-2/3 bg-primary-brown text-white text-xs font-bold py-2.5 rounded-xl hover:bg-[#4A3228]">Masuk Panel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel Form Khusus Musrif Tahfidz -->
+            <div id="musrif-form-box" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4 hidden">
+                <div class="flex justify-between items-center border-b border-cream pb-3">
+                    <div>
+                        <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
+                            <i class="fa-solid fa-book-quran"></i> Panel Musrif: Input Tahfidz & Agenda
+                        </h3>
+                        <p class="text-xs text-gray-600 mt-0.5">Memperbarui hafalan surat, ayat, dan agenda harian santri ke cloud.</p>
+                    </div>
+                    <button onclick="lockPanel()" class="text-[10px] bg-rose-100 text-rose-800 font-bold px-2.5 py-1.5 rounded-lg hover:bg-rose-200">
+                        <i class="fa-solid fa-lock mr-1"></i> Keluar
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-primary-brown mb-1">Nama Santri</label>
+                        <input type="text" id="musrif-nama" placeholder="Contoh: Ahmad Fauzan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Nama Surat / Juz Baru</label>
+                            <input type="text" id="musrif-surat" placeholder="Contoh: Surat An-Naba / Juz 30" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Rentang Ayat</label>
+                            <input type="text" id="musrif-ayat" placeholder="Contoh: Ayat 1 - 40" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Status Kelancaran Hafalan</label>
+                            <select id="musrif-status" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                                <option value="Lancar (Mumtaz)">Lancar (Mumtaz)</option>
+                                <option value="Cukup Lancar (Jayyid)">Cukup Lancar (Jayyid)</option>
+                                <option value="Perlu Diulang (Muraja'ah)">Perlu Diulang (Muraja'ah)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Agenda / Kegiatan</label>
+                            <input type="text" id="musrif-agenda" placeholder="Contoh: Latihan Muhadhoroh" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                        </div>
+                    </div>
+                    <button onclick="kirimDataMusrif()" class="w-full bg-primary-brown text-white text-xs font-bold py-3 rounded-xl hover:bg-[#4A3228] transition-colors shadow-sm">
+                        <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Simpan Tahfidz ke Cloud Firebase
+                    </button>
+                </div>
+            </div>
+
+            <!-- Panel Form Bendahara Detil (SPP, Gedung, Buku, Baju & Riwayat 3 Tahun) -->
+            <div id="bendahara-form-box" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4 hidden">
+                <div class="flex justify-between items-center border-b border-cream pb-3">
+                    <div>
+                        <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
+                            <i class="fa-solid fa-wallet"></i> Panel Bendahara: Rincian Keuangan & Arsip 3 Tahun
+                        </h3>
+                        <p class="text-xs text-gray-600 mt-0.5">Mendata SPP, Gedung, Buku, dan Baju dengan dukungan riwayat tahun lalu.</p>
+                    </div>
+                    <button onclick="lockPanel()" class="text-[10px] bg-rose-100 text-rose-800 font-bold px-2.5 py-1.5 rounded-lg hover:bg-rose-200">
+                        <i class="fa-solid fa-lock mr-1"></i> Keluar
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-primary-brown mb-1">Nama Santri</label>
+                        <input type="text" id="bendahara-nama" placeholder="Contoh: Ahmad Fauzan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Pos Pembayaran</label>
+                            <select id="bendahara-pos" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                                <option value="Uang SPP Bulanan">Uang SPP Bulanan</option>
+                                <option value="Uang Gedung / Infaq">Uang Gedung / Infaq</option>
+                                <option value="Pembelian Buku Kitab">Pembelian Buku Kitab</option>
+                                <option value="Pembelian Baju Seragam">Pembelian Baju Seragam</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Bulan Tagihan / Periode</label>
+                            <select id="bendahara-bulan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                                <option value="Januari">Januari</option>
+                                <option value="Februari">Februari</option>
+                                <option value="Maret">Maret</option>
+                                <option value="April">April</option>
+                                <option value="Mei">Mei</option>
+                                <option value="Juni">Juni</option>
+                                <option value="Juli">Juli</option>
+                                <option value="Agustus">Agustus</option>
+                                <option value="September">September</option>
+                                <option value="Oktober">Oktober</option>
+                                <option value="November">November</option>
+                                <option value="Desember">Desember</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Tahun (Arsip 3 Tahun)</label>
+                            <select id="bendahara-tahun" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                                <option value="2025">2025 (Tahun Lalu)</option>
+                                <option value="2026" selected>2026 (Tahun Berjalan)</option>
+                                <option value="2027">2027 (Tahun Depan)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Nominal (Rp)</label>
+                            <input type="text" id="bendahara-nominal" placeholder="Contoh: 350000" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Status Keuangan</label>
+                            <select id="bendahara-status" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                                <option value="Lunas">Lunas (Hijau)</option>
+                                <option value="Belum Lunas">Belum Lunas / Menunggak (Merah)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button onclick="kirimDataBendaharaDetail()" class="w-full bg-emerald-700 text-white text-xs font-bold py-3 rounded-xl hover:bg-emerald-800 transition-colors shadow-sm">
+                        <i class="fa-solid fa-file-invoice-dollar mr-1"></i> Simpan Arsip Keuangan ke Cloud Firebase
+                    </button>
+                </div>
+            </div>
+
         </section>
 
     </main>
@@ -280,8 +569,8 @@
                 <span class="text-[10px] font-medium mt-1">Scan Absen</span>
             </button>
             <button onclick="switchTab('keterangan')" id="btn-keterangan" class="nav-btn flex flex-col items-center flex-1 py-1 text-gray-400 hover:text-primary-brown transition-colors">
-                <i class="fa-solid fa-list-check text-lg"></i>
-                <span class="text-[10px] font-medium mt-1">Keterangan</span>
+                <i class="fa-solid fa-shield-halved text-lg"></i>
+                <span class="text-[10px] font-medium mt-1">Pengurus</span>
             </button>
         </div>
     </nav>
@@ -337,6 +626,118 @@
             document.getElementById('santri-list-view').classList.remove('hidden');
         }
 
+        let selectedRole = "";
+
+        function pilihPeran(role) {
+            selectedRole = role;
+            document.getElementById('role-select-box').classList.add('hidden');
+            document.getElementById('pin-login-box').classList.remove('hidden');
+            
+            const title = role === 'musrif' ? "PIN Musrif Tahfidz" : "PIN Bendahara Detail";
+            document.getElementById('label-role-title').innerText = title;
+        }
+
+        function kembaliKePilihPeran() {
+            selectedRole = "";
+            document.getElementById('pin-login-box').classList.add('hidden');
+            document.getElementById('role-select-box').classList.remove('hidden');
+            document.getElementById('input-pin-role').value = "";
+        }
+
+        function verifikasiPinRole() {
+            const pinInput = document.getElementById('input-pin-role').value.trim();
+            const pinMusrif = "1234";
+            const pinBendahara = "5678";
+
+            if (selectedRole === 'musrif' && pinInput === pinMusrif) {
+                document.getElementById('pin-login-box').classList.add('hidden');
+                document.getElementById('musrif-form-box').classList.remove('hidden');
+                document.getElementById('input-pin-role').value = "";
+            } else if (selectedRole === 'bendahara' && pinInput === pinBendahara) {
+                document.getElementById('pin-login-box').classList.add('hidden');
+                document.getElementById('bendahara-form-box').classList.remove('hidden');
+                document.getElementById('input-pin-role').value = "";
+            } else {
+                alert("PIN Salah! Akses ditolak.");
+            }
+        }
+
+        function lockPanel() {
+            document.getElementById('musrif-form-box').classList.add('hidden');
+            document.getElementById('bendahara-form-box').classList.add('hidden');
+            document.getElementById('pin-login-box').classList.add('hidden');
+            document.getElementById('role-select-box').classList.remove('hidden');
+            selectedRole = "";
+        }
+
+        let qrInstance = null;
+        function generateQRCode() {
+            const inputVal = document.getElementById('input-nama-santri').value.trim();
+            const container = document.getElementById('qrcode-container');
+            const qrDiv = document.getElementById('qrcode');
+            const labelNama = document.getElementById('label-qr-nama');
+
+            if (!inputVal) {
+                alert("Silakan masukkan nama atau NISN santri terlebih dahulu!");
+                return;
+            }
+
+            container.classList.remove('hidden');
+            labelNama.innerText = "QR Code: " + inputVal;
+            qrDiv.innerHTML = "";
+
+            qrInstance = new QRCode(qrDiv, {
+                text: inputVal,
+                width: 160,
+                height: 160,
+                colorDark: "#5C4033",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+
+        function kirimDataMusrif() {
+            const nama = document.getElementById('musrif-nama').value.trim();
+            const surat = document.getElementById('musrif-surat').value.trim();
+            const ayat = document.getElementById('musrif-ayat').value.trim();
+            const status = document.getElementById('musrif-status').value;
+            const agenda = document.getElementById('musrif-agenda').value.trim();
+
+            if (!nama || !surat) {
+                alert("Mohon isi Nama Santri dan Nama Surat terlebih dahulu!");
+                return;
+            }
+
+            if (window.simpanTahfidzMusrif) {
+                window.simpanTahfidzMusrif(nama, surat, ayat, status, agenda);
+                document.getElementById('musrif-nama').value = "";
+                document.getElementById('musrif-surat').value = "";
+                document.getElementById('musrif-ayat').value = "";
+                document.getElementById('musrif-agenda').value = "";
+            }
+        }
+
+        // Kirim Data Bendahara Detail (SPP, Gedung, Buku, Baju & Arsip 3 Tahun)
+        function kirimDataBendaharaDetail() {
+            const nama = document.getElementById('bendahara-nama').value.trim();
+            const pos = document.getElementById('bendahara-pos').value;
+            const bulan = document.getElementById('bendahara-bulan').value;
+            const tahun = document.getElementById('bendahara-tahun').value;
+            const nominal = document.getElementById('bendahara-nominal').value.trim();
+            const status = document.getElementById('bendahara-status').value;
+
+            if (!nama || !nominal) {
+                alert("Mohon isi Nama Santri dan Nominal Pembayaran terlebih dahulu!");
+                return;
+            }
+
+            if (window.simpanKeuanganBendaharaDetail) {
+                window.simpanKeuanganBendaharaDetail(nama, pos, bulan, tahun, nominal, status);
+                document.getElementById('bendahara-nama').value = "";
+                document.getElementById('bendahara-nominal').value = "";
+            }
+        }
+
         let html5QrCode;
         function startQrScanner() {
             const readerDiv = document.getElementById('reader');
@@ -351,15 +752,31 @@
                 { fps: 10, qrbox: { width: 200, height: 200 } },
                 (decodedText, decodedResult) => {
                     stopQrScanner();
-                    document.getElementById('qr-result-box').classList.remove('hidden');
-                    document.getElementById('qr-text-output').innerText = "Data Terdeteksi: " + decodedText;
-                    
+
                     const now = new Date();
+                    const jam = now.getHours();
+                    const menit = now.getMinutes();
+                    const totalMenit = jam * 60 + menit;
+
+                    let jenisAbsen = "Aktivitas Harian / Umum";
+
+                    if (totalMenit >= 300 && totalMenit <= 450) { 
+                        jenisAbsen = "Absen Masuk Sekolah / Sholat Subuh";
+                    } else if (totalMenit >= 690 && totalMenit <= 810) { 
+                        jenisAbsen = "Absen Sholat Dzuhur Berjamaah";
+                    } else if (totalMenit >= 900 && totalMenit <= 990) { 
+                        jenisAbsen = "Absen Sholat Ashar Berjamaah";
+                    } else if (totalMenit >= 1080 && totalMenit <= 1170) { 
+                        jenisAbsen = "Absen Sholat Maghrib / Isya Berjamaah";
+                    }
+
+                    document.getElementById('qr-result-box').classList.remove('hidden');
+                    document.getElementById('qr-text-output').innerHTML = `<b>Santri:</b> ${decodedText}<br><b>Kategori:</b> <span class="text-emerald-700 font-bold">${jenisAbsen}</span>`;
+                    
                     document.getElementById('qr-timestamp').innerText = "Waktu Tercatat: " + now.toLocaleDateString('id-ID') + " Pukul " + now.toLocaleTimeString('id-ID') + " WIB";
 
-                    // Kirim otomatis ke Firebase Database yang sudah kita buat
                     if (window.simpanKeFirebase) {
-                        window.simpanKeFirebase(decodedText, "Hadir Tepat Waktu");
+                        window.simpanKeFirebase(decodedText, jenisAbsen);
                     }
                 },
                 (errorMessage) => {}
