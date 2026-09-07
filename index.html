@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- FontAwesome untuk Ikon -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Library QR Code Scanner (Html5-QRCode) -->
+    <!-- Library QR Code Scanner -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <!-- Library QRCode Generator -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -20,7 +20,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Konfigurasi Firebase dari Proyek Anda
         const firebaseConfig = {
             apiKey: "AIzaSyBay7zJ_G-qztsStW7PtjZMRVSPOowrvPw",
             authDomain: "absensi-pesantren-84f67.firebaseapp.com",
@@ -33,7 +32,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Fungsi Simpan Absen ke Firebase Cloud
+        // Fungsi Simpan Absen ke Firebase Cloud (Dengan Deteksi Waktu Otomatis)
         window.simpanKeFirebase = async function(namaSantri, statusKeterangan) {
             try {
                 await addDoc(collection(db, "riwayat_absensi"), {
@@ -48,7 +47,7 @@
             }
         };
 
-        // Fungsi Simpan Update Tahfidz / Agenda Musrif ke Firebase Cloud
+        // Fungsi Simpan Tahfidz & Agenda Musrif ke Cloud
         window.simpanTahfidzMusrif = async function(namaSantri, surat, ayat, statusHafalan, catatanAgenda) {
             try {
                 await addDoc(collection(db, "catatan_musrif"), {
@@ -67,20 +66,20 @@
             }
         };
 
-        // Fungsi Simpan Data Keuangan Detail 3 Tahun oleh Bendahara ke Firebase Cloud
+        // Fungsi Simpan Keuangan Detail (SPP, Gedung, Buku, Baju 3 Tahun) ke Cloud
         window.simpanKeuanganBendaharaDetail = async function(namaSantri, jenisPos, bulanTagih, tahunTagih, nominal, statusBayar) {
             try {
                 await addDoc(collection(db, "catatan_keuangan_detail"), {
                     namaSantri: namaSantri,
-                    jenisPos: jenisPos, // SPP / Gedung / Buku / Baju
+                    jenisPos: jenisPos,
                     bulan: bulanTagih,
                     tahun: tahunTagih,
                     nominal: nominal,
-                    status: statusBayar, // Lunas / Belum Lunas
+                    status: statusBayar,
                     waktuInput: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
                     timestamp: Date.now()
                 });
-                alert("Berhasil! Rincian keuangan 3 tahun tersimpan ke Cloud Firebase.");
+                alert("Berhasil! Arsip keuangan 3 tahun tersimpan ke Cloud Firebase.");
             } catch (e) {
                 console.error("Gagal menyimpan data keuangan detail: ", e);
                 alert("Gagal menyimpan ke database keuangan.");
@@ -188,7 +187,7 @@
             </div>
         </section>
 
-        <!-- 2. MENU SANTRI & REKAP LENGKAP DENGAN INDIKATOR KEUANGAN 3 TAHUN -->
+        <!-- 2. MENU SANTRI & REKAP (BERSIH & OTOMATIS BERDASARKAN WAKTU HP) -->
         <section id="menu-santri" class="space-y-6 hidden">
             <div id="santri-list-view" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-cream pb-3">
@@ -196,7 +195,7 @@
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
                             <i class="fa-solid fa-address-book"></i> Daftar Rekapitulasi Santri
                         </h3>
-                        <p class="text-xs text-gray-600 mt-0.5">Pilih santri untuk melihat rekapitulasi sekolah, sholat, dan riwayat keuangan 3 tahun.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">Pilih santri untuk melihat rekapitulasi kehadiran, sholat, keuangan 3 tahun, dan tahfidz.</p>
                     </div>
                     <div class="w-full sm:w-auto">
                         <input type="text" id="search-santri" onkeyup="filterSantri()" placeholder="Cari nama atau kelas..." class="w-full sm:w-64 text-xs px-3 py-2 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
@@ -232,7 +231,7 @@
                 </div>
             </div>
 
-            <!-- Detail View Lengkap + Indikator Merah/Hijau Keuangan 3 Tahun -->
+            <!-- Detail View Rekapitulasi Santri -->
             <div id="santri-detail-view" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-5 hidden">
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <button onclick="closeDetailSantri()" class="text-xs bg-soft-cream text-primary-brown px-3 py-1.5 rounded-lg font-semibold hover:bg-[#E3D5C9]">
@@ -252,100 +251,56 @@
                     </span>
                 </div>
 
-                <!-- RIWAYAT KEUANGAN & TUNGGAKAN 3 TAHUN (DENGAN TANDA HIJAU / MERAH) -->
+                <!-- Arsip Keuangan & Tunggakan 3 Tahun (Indikator Hijau / Merah) -->
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center justify-between">
                         <span><i class="fa-solid fa-wallet mr-1"></i> Riwayat Keuangan & SPP (Arsip 3 Tahun)</span>
-                        <span class="text-[10px] font-normal text-gray-500">Menampilkan status lunas & tunggakan lalu</span>
+                        <span class="text-[10px] font-normal text-gray-500">Terisi otomatis dari input bendahara</span>
                     </h4>
 
-                    <div class="space-y-2">
-                        <!-- Contoh Arsip 2025 (Misal: Oktober 2025 Belum Lunas -> Merah) -->
-                        <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl flex justify-between items-center">
-                            <div>
-                                <span class="font-bold text-xs text-rose-900 block">SPP Bulanan Pesantren • Oktober 2025</span>
-                                <span class="text-[11px] text-rose-700">Nominal: Rp 350.000 (Arsip Tahun Ajaran 2025/2026)</span>
-                            </div>
-                            <span class="text-[10px] bg-rose-200 text-rose-900 font-bold px-2.5 py-1 rounded-lg">
-                                <i class="fa-solid fa-triangle-exclamation mr-1"></i> BELUM LUNAS (MENUNGGAK)
-                            </span>
-                        </div>
-
-                        <!-- Contoh Arsip 2026 (Misal: Agustus 2026 Lunas -> Hijau) -->
-                        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex justify-between items-center">
-                            <div>
-                                <span class="font-bold text-xs text-emerald-900 block">SPP Bulanan Pesantren • Agustus 2026</span>
-                                <span class="text-[11px] text-emerald-700">Nominal: Rp 350.000 • Pembayaran Buku & Baju Seragam</span>
-                            </div>
-                            <span class="text-[10px] bg-emerald-200 text-emerald-900 font-bold px-2.5 py-1 rounded-lg">
-                                <i class="fa-solid fa-check mr-1"></i> LUNAS (TERVERIFIKASI)
-                            </span>
+                    <div id="container-keuangan-santri" class="space-y-2">
+                        <!-- Data akan terisi dinamis atau menampilkan status kosong (-) jika belum ada data -->
+                        <div class="p-3 bg-soft-cream border border-[#E3D5C9] rounded-xl text-center text-xs text-gray-500">
+                            Belum ada catatan keuangan yang diinput oleh bendahara.
                         </div>
                     </div>
                 </div>
 
-                <!-- 1. Rekap Kehadiran Sekolah -->
+                <!-- 1. Pemantauan Sholat 5 Waktu Berjamaah (Otomatis Berdasarkan Jam HP) -->
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-clipboard-user"></i> Rekapitulasi Kehadiran Sekolah
+                        <i class="fa-solid fa-kaaba"></i> Pemantauan Sholat 5 Waktu Berjamaah (Auto-Time)
                     </h4>
-                    <div class="grid grid-cols-3 gap-2 text-center">
-                        <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200">
-                            <span class="block text-[10px] text-emerald-700 font-semibold">Hadir</span>
-                            <span class="text-base font-bold text-emerald-800">96 Hari</span>
-                        </div>
-                        <div class="bg-amber-50 p-3 rounded-xl border border-amber-200">
-                            <span class="block text-[10px] text-amber-700 font-semibold">Izin / Sakit</span>
-                            <span class="text-base font-bold text-amber-800">2 Hari</span>
-                        </div>
-                        <div class="bg-rose-50 p-3 rounded-xl border border-rose-200">
-                            <span class="block text-[10px] text-rose-700 font-semibold">Alpa</span>
-                            <span class="text-base font-bold text-rose-800">0 Hari</span>
-                        </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center" id="sholat-status-grid">
+                        <!-- Diisi otomatis via JavaScript berdasarkan jam perangkat saat ini -->
                     </div>
                 </div>
 
-                <!-- 2. Pemantauan Sholat 5 Waktu Berjamaah -->
+                <!-- 2. Sholat Sunnah & Amalan Harian -->
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-kaaba"></i> Pemantauan Sholat 5 Waktu Berjamaah
+                        <i class="fa-solid fa-star-and-crescent"></i> Amalan Sholat Sunnah & Dhuha
                     </h4>
-                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
-                        <div class="bg-soft-cream p-2.5 rounded-xl border border-[#E3D5C9]">
-                            <span class="block text-[10px] text-gray-600 font-medium">Subuh</span>
-                            <span class="text-xs font-bold text-emerald-700"><i class="fa-solid fa-check mr-1"></i> Berjamaah</span>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex items-center justify-between">
+                            <span class="text-xs font-medium text-gray-700">Sholat Dhuha</span>
+                            <span id="status-dhuha" class="text-xs font-bold text-gray-400">-</span>
                         </div>
-                        <div class="bg-soft-cream p-2.5 rounded-xl border border-[#E3D5C9]">
-                            <span class="block text-[10px] text-gray-600 font-medium">Dzuhur</span>
-                            <span class="text-xs font-bold text-emerald-700"><i class="fa-solid fa-check mr-1"></i> Berjamaah</span>
-                        </div>
-                        <div class="bg-soft-cream p-2.5 rounded-xl border border-[#E3D5C9]">
-                            <span class="block text-[10px] text-gray-600 font-medium">Ashar</span>
-                            <span class="text-xs font-bold text-emerald-700"><i class="fa-solid fa-check mr-1"></i> Berjamaah</span>
-                        </div>
-                        <div class="bg-soft-cream p-2.5 rounded-xl border border-[#E3D5C9]">
-                            <span class="block text-[10px] text-gray-600 font-medium">Maghrib</span>
-                            <span class="text-xs font-bold text-emerald-700"><i class="fa-solid fa-check mr-1"></i> Berjamaah</span>
-                        </div>
-                        <div class="bg-soft-cream p-2.5 rounded-xl border border-[#E3D5C9]">
-                            <span class="block text-[10px] text-gray-600 font-medium">Isya</span>
-                            <span class="text-xs font-bold text-emerald-700"><i class="fa-solid fa-check mr-1"></i> Berjamaah</span>
+                        <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex items-center justify-between">
+                            <span class="text-xs font-medium text-gray-700">Tahajud / Witir</span>
+                            <span id="status-tahajud" class="text-xs font-bold text-gray-400">-</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- 3. Aktivitas Harian & Ekstrakurikuler -->
+                <!-- 3. Aktivitas Harian, Tahfidz & Ekstrakurikuler -->
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
                         <i class="fa-solid fa-book-open-reader"></i> Aktivitas, Tahfidz & Ekstrakurikuler
                     </h4>
-                    <div class="space-y-2">
-                        <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
-                            <div>
-                                <span class="font-bold text-xs text-primary-brown block">Setoran Tahfidz Al-Quran</span>
-                                <span class="text-[11px] text-gray-600">Surat An-Nazi'at • Juz 30</span>
-                            </div>
-                            <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-lg">Lancar (Mumtaz)</span>
+                    <div id="container-tahfidz-santri" class="space-y-2">
+                        <div class="p-3 bg-soft-cream border border-[#E3D5C9] rounded-xl text-center text-xs text-gray-500">
+                            Belum ada setoran tahfidz atau agenda musrif yang diinput.
                         </div>
                     </div>
                 </div>
@@ -400,7 +355,7 @@
                         <i class="fa-solid fa-book-quran block text-lg mb-1"></i> Musrif Tahfidz
                     </button>
                     <button onclick="pilihPeran('bendahara')" class="p-3 bg-soft-cream border border-cream rounded-xl hover:border-primary-brown text-xs font-bold text-primary-brown transition-all">
-                        <i class="fa-solid wallet block text-lg mb-1"></i> Bendahara Detail
+                        <i class="fa-solid fa-wallet block text-lg mb-1"></i> Bendahara Detail
                     </button>
                 </div>
             </div>
@@ -472,7 +427,7 @@
                 </div>
             </div>
 
-            <!-- Panel Form Bendahara Detil (SPP, Gedung, Buku, Baju & Riwayat 3 Tahun) -->
+            <!-- Panel Form Bendahara Detil -->
             <div id="bendahara-form-box" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4 hidden">
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <div>
@@ -610,6 +565,54 @@
             }
         }
 
+        // Render Logika Otomatis Berdasarkan Jam HP untuk Sholat 5 Waktu
+        function renderStatusSholatOtomatis() {
+            const now = new Date();
+            const jam = now.getHours();
+            const menit = now.getMinutes();
+            const totalMenit = jam * 60 + menit;
+
+            // Batas Waktu Jadwal Sholat Berjamaah (dalam menit)
+            // Subuh: 04.00 - 06.00 (240 - 360)
+            // Dzuhur: 11.30 - 14.00 (690 - 840)
+            // Ashar: 15.00 - 17.30 (900 - 1050)
+            // Maghrib: 18.00 - 19.00 (1080 - 1140)
+            // Isya: 19.00 - 21.00 (1140 - 1260)
+
+            const daftarSholat = [
+                { nama: "Subuh", start: 240, end: 360 },
+                { nama: "Dzuhur", start: 690, end: 840 },
+                { nama: "Ashar", start: 900, end: 1050 },
+                { nama: "Maghrib", start: 1080, end: 1140 },
+                { nama: "Isya", start: 1140, end: 1260 }
+            ];
+
+            let html = "";
+            daftarSholat.forEach(s => {
+                let statusBadge = "";
+                
+                if (totalMenit > s.end) {
+                    // Waktu sudah lewat tapi belum diabsen -> SILANG (Merah)
+                    statusBadge = `<span class="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded-lg block"><i class="fa-solid fa-xmark mr-1"></i> Alfa / Terlewat</span>`;
+                } else if (totalMenit >= s.start && totalMenit <= s.end) {
+                    // Sedang berlangsung / Waktu Absen -> Belum Absen (Kuning / Menunggu)
+                    statusBadge = `<span class="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg block"><i class="fa-solid fa-clock mr-1"></i> Belum Absen</span>`;
+                } else {
+                    // Waktu belum tiba (di masa depan) -> KOSONG (-)
+                    statusBadge = `<span class="text-xs font-bold text-gray-400 bg-gray-50 border border-gray-200 px-2 py-1 rounded-lg block">- (Belum Waktunya)</span>`;
+                }
+
+                html += `
+                    <div class="bg-soft-cream p-2.5 rounded-xl border border-[#E3D5C9]">
+                        <span class="block text-[10px] text-gray-600 font-medium mb-1">${s.nama}</span>
+                        ${statusBadge}
+                    </div>
+                `;
+            });
+
+            document.getElementById('sholat-status-grid').innerHTML = html;
+        }
+
         function openDetailSantri(nama, kelas, nisn, asrama) {
             document.getElementById('santri-list-view').classList.add('hidden');
             document.getElementById('santri-detail-view').classList.remove('hidden');
@@ -619,6 +622,9 @@
 
             const now = new Date();
             document.getElementById('current-timestamp').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }) + ", " + now.toLocaleTimeString('id-ID') + " WIB";
+
+            // Jalankan pengecekan status sholat otomatis berdasarkan jam perangkat
+            renderStatusSholatOtomatis();
         }
 
         function closeDetailSantri() {
@@ -717,7 +723,6 @@
             }
         }
 
-        // Kirim Data Bendahara Detail (SPP, Gedung, Buku, Baju & Arsip 3 Tahun)
         function kirimDataBendaharaDetail() {
             const nama = document.getElementById('bendahara-nama').value.trim();
             const pos = document.getElementById('bendahara-pos').value;
@@ -760,14 +765,16 @@
 
                     let jenisAbsen = "Aktivitas Harian / Umum";
 
-                    if (totalMenit >= 300 && totalMenit <= 450) { 
-                        jenisAbsen = "Absen Masuk Sekolah / Sholat Subuh";
-                    } else if (totalMenit >= 690 && totalMenit <= 810) { 
+                    if (totalMenit >= 240 && totalMenit <= 360) { 
+                        jenisAbsen = "Absen Sholat Subuh Berjamaah";
+                    } else if (totalMenit >= 690 && totalMenit <= 840) { 
                         jenisAbsen = "Absen Sholat Dzuhur Berjamaah";
-                    } else if (totalMenit >= 900 && totalMenit <= 990) { 
+                    } else if (totalMenit >= 900 && totalMenit <= 1050) { 
                         jenisAbsen = "Absen Sholat Ashar Berjamaah";
-                    } else if (totalMenit >= 1080 && totalMenit <= 1170) { 
-                        jenisAbsen = "Absen Sholat Maghrib / Isya Berjamaah";
+                    } else if (totalMenit >= 1080 && totalMenit <= 1140) { 
+                        jenisAbsen = "Absen Sholat Maghrib Berjamaah";
+                    } else if (totalMenit >= 1140 && totalMenit <= 1260) {
+                        jenisAbsen = "Absen Sholat Isya Berjamaah";
                     }
 
                     document.getElementById('qr-result-box').classList.remove('hidden');
