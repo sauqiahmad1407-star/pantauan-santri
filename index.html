@@ -32,20 +32,17 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Fungsi Simpan Catatan/Aktivitas Hasil Scan QR ke Cloud
-        window.simpanAktivitasScan = async function(namaSantri, jenisAktivitas, detailKeterangan) {
+        // Fungsi Simpan Catatan Musrif / Hasil Scan Interaktif ke Cloud
+        window.simpanCatatanMusrifCloud = async function(dataObjek) {
             try {
                 await addDoc(collection(db, "catatan_musrif"), {
-                    namaSantri: namaSantri,
-                    kategori: "scan_interaktif",
-                    kegiatan: jenisAktivitas,
-                    catatan: detailKeterangan,
+                    ...dataObjek,
                     waktuUpdate: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
                     timestamp: Date.now()
                 });
-                alert("Berhasil! Aktivitas " + jenisAktivitas + " untuk " + namaSantri + " tersimpan ke Cloud.");
+                alert("Berhasil! Data aktivitas santri tersimpan ke Cloud Firebase.");
             } catch (e) {
-                console.error("Gagal menyimpan aktivitas scan: ", e);
+                console.error("Gagal menyimpan ke database: ", e);
                 alert("Gagal menyimpan ke database.");
             }
         };
@@ -93,33 +90,30 @@
                     snapshotMusrif.forEach((doc) => {
                         const data = doc.data();
                         
-                        // Jika dari input manual atau scan interaktif
-                        const infoKegiatan = data.kegiatan || data.surat || data.amalan || '-';
-                        const infoKet = data.catatan || data.status || data.keterangan || '-';
-
-                        if (data.kategori === "tahfidz" || (infoKegiatan.includes('Ziyadah') || infoKegiatan.includes('Murojaah') || infoKegiatan.includes('Imtihan'))) {
+                        if (data.kategori === "tahfidz") {
                             htmlTahfidz += `
                                 <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
                                     <div>
-                                        <span class="font-bold text-xs text-primary-brown block">${infoKegiatan}</span>
+                                        <span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded uppercase tracking-wider">${data.jenisSetoran || 'Setoran'}</span>
+                                        <span class="font-bold text-xs text-primary-brown block mt-1">${data.surat} (${data.ayat})</span>
                                         <span class="text-[10px] text-gray-500">${data.waktuUpdate}</span>
                                     </div>
-                                    <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded">${infoKet}</span>
+                                    <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded">${data.status}</span>
                                 </div>
                             `;
-                        } else if (data.kategori === "sunnah" || infoKegiatan.includes('Sholat Dhuha') || infoKegiatan.includes('Puasa') || infoKegiatan.includes('Qobliyah') || infoKegiatan.includes('Ba\'diyah')) {
+                        } else if (data.kategori === "sunnah") {
                             htmlSunnah += `
                                 <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
-                                    <span class="text-xs font-medium text-gray-700"><i class="fa-solid fa-star text-amber-500 mr-1.5"></i> ${infoKegiatan}</span>
-                                    <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-lg">${infoKet}</span>
+                                    <span class="text-xs font-medium text-gray-700"><i class="fa-solid fa-star text-amber-500 mr-1.5"></i> ${data.amalan}</span>
+                                    <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-lg">${data.keterangan || 'Dikerjakan'}</span>
                                 </div>
                             `;
-                        } else {
+                        } else if (data.kategori === "agenda") {
                             htmlAgenda += `
                                 <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
                                     <div>
-                                        <span class="font-bold text-xs text-primary-brown block"><i class="fa-solid fa-bookmark text-amber-600 mr-1"></i> ${infoKegiatan}</span>
-                                        <span class="text-[11px] text-gray-600">${infoKet}</span>
+                                        <span class="font-bold text-xs text-primary-brown block"><i class="fa-solid fa-bookmark text-amber-600 mr-1"></i> ${data.kegiatan}</span>
+                                        <span class="text-[11px] text-gray-600">${data.catatan || '-'}</span>
                                     </div>
                                     <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-2.5 py-0.5 rounded">Tercatat</span>
                                 </div>
@@ -382,7 +376,7 @@
                     <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
                         <i class="fa-solid fa-qrcode"></i> Scan QR Code & Input Aktivitas Santri
                     </h3>
-                    <p class="text-xs text-gray-600 mt-0.5">Arahkan kamera ke Kartu Santri. Sistem akan mendeteksi sholat otomatis atau memunculkan pilihan amalan sunnah/tahfidz.</p>
+                    <p class="text-xs text-gray-600 mt-0.5">Arahkan kamera ke Kartu Santri. Pilih jenis kegiatan (Tahfidz, Sunnah, atau Agenda Khusus).</p>
                 </div>
 
                 <div class="py-3">
@@ -396,49 +390,89 @@
 
                 <div id="reader" class="w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-cream hidden"></div>
 
-                <!-- KOTAK POP-UP INTERAKTIF PASCA-SCAN QR -->
-                <div id="interactive-scan-box" class="hidden p-5 bg-amber-50 border border-amber-200 rounded-2xl text-left space-y-3">
+                <!-- KOTAK POP-UP INTERAKTIF PASCA-SCAN QR (DENGAN FORM SPESIFIK) -->
+                <div id="interactive-scan-box" class="hidden p-5 bg-amber-50 border border-amber-200 rounded-2xl text-left space-y-4">
                     <div class="flex items-center justify-between border-b border-amber-200 pb-2">
                         <span class="text-xs font-bold text-amber-900"><i class="fa-solid fa-user-check mr-1"></i> Santri Terdeteksi:</span>
                         <span id="scanned-santri-name" class="text-xs font-bold bg-amber-200 text-amber-900 px-2.5 py-0.5 rounded-full">-</span>
                     </div>
 
+                    <!-- Pilih Kategori Input Pasca Scan -->
                     <div>
-                        <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Jenis Aktivitas / Ibadah Saat Ini:</label>
-                        <select id="scan-pilihan-aktivitas" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown">
-                            <optgroup label="-- Sholat Wajib (Auto Jam) --">
-                                <option value="Absen Sholat Berjamaah">Absen Sholat Berjamaah (Sesuai Waktu Aktif)</option>
-                            </optgroup>
-                            <optgroup label="-- Tahfidz Al-Quran --">
-                                <option value="Ziyadah (Hafalan Baru)">Ziyadah (Hafalan Baru)</option>
-                                <option value="Murojaah (Pengulangan)">Murojaah (Pengulangan)</option>
-                                <option value="Imtihan (Ujian / Tasmi')">Imtihan (Ujian / Tasmi')</option>
-                            </optgroup>
-                            <optgroup label="-- Amalan Sunnah & Puasa --">
-                                <option value="Sholat Dhuha">Sholat Dhuha</option>
-                                <option value="Puasa Senin-Kamis">Puasa Senin-Kamis</option>
-                                <option value="Puasa Daud">Puasa Daud</option>
-                                <option value="Qobliyah Subuh">Qobliyah Subuh</option>
-                                <option value="Ba'diyah Dzuhur">Ba'diyah Dzuhur</option>
-                                <option value="Ba'diyah Maghrib">Ba'diyah Maghrib</option>
-                                <option value="Ba'diyah Isya">Ba'diyah Isya</option>
-                            </optgroup>
-                            <optgroup label="-- Amalan Khusus & Kegiatan --">
-                                <option value="Membaca Surat Al-Kahfi di Hari Jumat">Membaca Surat Al-Kahfi di Hari Jumat</option>
-                                <option value="Berdoa di Petang Jumat">Berdoa di Petang Jumat</option>
-                                <option value="Dzikir Pagi & Petang">Dzikir Pagi & Petang</option>
-                                <option value="Kajian Kitab Kuning">Kajian Kitab Kuning</option>
-                                <option value="Muhadhoroh (Pidato / Dakwah)">Muhadhoroh (Pidato / Dakwah)</option>
-                            </optgroup>
+                        <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Kategori Kegiatan:</label>
+                        <select id="scan-kategori-pilih" onchange="gantiFormScan()" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown font-semibold text-primary-brown">
+                            <option value="sholat">1. Absen Sholat Wajib (Auto Jam)</option>
+                            <option value="tahfidz">2. Setoran Tahfidz (Ziyadah / Murojaah / Imtihan)</option>
+                            <option value="sunnah">3. Amalan Sunnah & Puasa</option>
+                            <option value="agenda">4. Amalan Khusus (Al-Kahfi, Kajian, Muhadhoroh)</option>
                         </select>
                     </div>
 
-                    <div>
-                        <label class="block text-xs font-bold text-primary-brown mb-1">Keterangan / Detail (Opsional)</label>
-                        <input type="text" id="scan-detail-ket" placeholder="Contoh: Juz 30 Ayat 1-10 / Lancar Mumtaz" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown">
+                    <!-- 1. Form Sholat -->
+                    <div id="subform-sholat" class="space-y-2">
+                        <p class="text-[11px] text-gray-600 bg-white p-2.5 rounded-lg border border-cream">Sistem akan otomatis mendeteksi sholat wajib (Subuh/Dzuhur/Ashar/Maghrib/Isya) berdasarkan jam saat ini.</p>
                     </div>
 
-                    <div class="flex gap-2 pt-1">
+                    <!-- 2. Form Tahfidz (Lengkap dengan Ziyadah/Murojaah/Imtihan & Surat/Ayat) -->
+                    <div id="subform-tahfidz" class="space-y-3 hidden">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-bold text-primary-brown mb-1">Jenis Setoran</label>
+                                <select id="scan-tahfidz-jenis" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                    <option value="Ziyadah (Hafalan Baru)">Ziyadah (Hafalan Baru)</option>
+                                    <option value="Murojaah (Pengulangan)">Murojaah (Pengulangan)</option>
+                                    <option value="Imtihan (Ujian / Tasmi')">Imtihan (Ujian / Tasmi')</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-primary-brown mb-1">Kelancaran</label>
+                                <select id="scan-tahfidz-status" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                    <option value="Lancar (Mumtaz)">Lancar (Mumtaz)</option>
+                                    <option value="Cukup Lancar (Jayyid)">Cukup Lancar (Jayyid)</option>
+                                    <option value="Perlu Diulang (Muraja'ah)">Perlu Diulang (Muraja'ah)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-bold text-primary-brown mb-1">Nama Surat / Juz</label>
+                                <input type="text" id="scan-tahfidz-surat" placeholder="Contoh: An-Naba / Juz 30" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-primary-brown mb-1">Rentang Ayat</label>
+                                <input type="text" id="scan-tahfidz-ayat" placeholder="Contoh: Ayat 1-15" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Form Sunnah -->
+                    <div id="subform-sunnah" class="space-y-2 hidden">
+                        <label class="block text-[11px] font-bold text-primary-brown mb-1">Pilih Amalan Sunnah / Puasa</label>
+                        <select id="scan-sunnah-jenis" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                            <option value="Sholat Dhuha">Sholat Dhuha</option>
+                            <option value="Puasa Senin-Kamis">Puasa Senin-Kamis</option>
+                            <option value="Puasa Daud">Puasa Daud</option>
+                            <option value="Qobliyah Subuh">Qobliyah Subuh</option>
+                            <option value="Ba'diyah Dzuhur">Ba'diyah Dzuhur</option>
+                            <option value="Ba'diyah Maghrib">Ba'diyah Maghrib</option>
+                            <option value="Ba'diyah Isya">Ba'diyah Isya</option>
+                        </select>
+                    </div>
+
+                    <!-- 4. Form Agenda Khusus (Al-Kahfi, Kajian, Muhadhoroh, dll) -->
+                    <div id="subform-agenda" class="space-y-2 hidden">
+                        <label class="block text-[11px] font-bold text-primary-brown mb-1">Pilih Amalan Khusus / Kegiatan</label>
+                        <select id="scan-agenda-jenis" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                            <option value="Membaca Surat Al-Kahfi di Hari Jumat">Membaca Surat Al-Kahfi di Hari Jumat</option>
+                            <option value="Berdoa di Petang Jumat">Berdoa di Petang Jumat (Asar - Maghrib)</option>
+                            <option value="Dzikir Pagi & Petang">Dzikir Pagi & Petang</option>
+                            <option value="Kajian Kitab Kuning">Kajian Kitab Kuning</option>
+                            <option value="Muhadhoroh (Pidato / Dakwah)">Muhadhoroh (Pidato / Dakwah)</option>
+                        </select>
+                        <input type="text" id="scan-agenda-catatan" placeholder="Catatan tambahan (Opsional)" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white mt-1">
+                    </div>
+
+                    <div class="flex gap-2 pt-2">
                         <button onclick="batalScanInteraktif()" class="w-1/3 bg-gray-200 text-gray-700 text-xs font-bold py-2.5 rounded-xl hover:bg-gray-300">Batal</button>
                         <button onclick="kirimAktivitasScanCloud()" class="w-2/3 bg-primary-brown text-white text-xs font-bold py-2.5 rounded-xl hover:bg-[#4A3228]">Simpan ke Cloud</button>
                     </div>
@@ -754,7 +788,17 @@
             }
         }
 
-        // Variabel untuk menyimpan nama santri yang sedang diset-scan
+        // Kontrol Ganti Form di Pop-up Scan QR
+        function gantiFormScan() {
+            const kat = document.getElementById('scan-kategori-pilih').value;
+            document.getElementById('subform-sholat').classList.add('hidden');
+            document.getElementById('subform-tahfidz').classList.add('hidden');
+            document.getElementById('subform-sunnah').classList.add('hidden');
+            document.getElementById('subform-agenda').classList.add('hidden');
+
+            document.getElementById('subform-' + kat).classList.remove('hidden');
+        }
+
         let currentScannedSantri = "";
         let html5QrCode;
 
@@ -774,9 +818,9 @@
                     stopQrScanner();
                     currentScannedSantri = decodedText;
 
-                    // Tampilkan Pop-up Menu Pilihan Aktivitas Pasca-Scan
                     document.getElementById('scanned-santri-name').innerText = decodedText;
                     document.getElementById('interactive-scan-box').classList.remove('hidden');
+                    gantiFormScan();
                 },
                 (errorMessage) => {}
             ).catch((err) => {
@@ -802,30 +846,56 @@
         }
 
         function kirimAktivitasScanCloud() {
-            const aktivitas = document.getElementById('scan-pilihan-aktivitas').value;
-            const detail = document.getElementById('scan-detail-ket').value.trim();
+            const kat = document.getElementById('scan-kategori-pilih').value;
+            let payload = { namaSantri: currentScannedSantri };
 
-            if (!currentScannedSantri) {
-                alert("Nama santri tidak valid.");
-                return;
-            }
-
-            // Jika memilih sholat berjamaah, sesuaikan otomatis dengan jam saat ini
-            let finalAktivitas = aktivitas;
-            if (aktivitas === "Absen Sholat Berjamaah") {
+            if (kat === 'sholat') {
                 const now = new Date();
                 const totalMenit = now.getHours() * 60 + now.getMinutes();
-                if (totalMenit >= 240 && totalMenit <= 360) finalAktivitas = "Absen Sholat Subuh Berjamaah";
-                else if (totalMenit >= 690 && totalMenit <= 840) finalAktivitas = "Absen Sholat Dzuhur Berjamaah";
-                else if (totalMenit >= 900 && totalMenit <= 1050) finalAktivitas = "Absen Sholat Ashar Berjamaah";
-                else if (totalMenit >= 1080 && totalMenit <= 1140) finalAktivitas = "Absen Sholat Maghrib Berjamaah";
-                else if (totalMenit >= 1140 && totalMenit <= 1260) finalAktivitas = "Absen Sholat Isya Berjamaah";
-                else finalAktivitas = "Absen Sholat Berjamaah (Diluar Jam Utama)";
+                let jenisAbsen = "Absen Sholat Berjamaah";
+                if (totalMenit >= 240 && totalMenit <= 360) jenisAbsen = "Absen Sholat Subuh Berjamaah";
+                else if (totalMenit >= 690 && totalMenit <= 840) jenisAbsen = "Absen Sholat Dzuhur Berjamaah";
+                else if (totalMenit >= 900 && totalMenit <= 1050) jenisAbsen = "Absen Sholat Ashar Berjamaah";
+                else if (totalMenit >= 1080 && totalMenit <= 1140) jenisAbsen = "Absen Sholat Maghrib Berjamaah";
+                else if (totalMenit >= 1140 && totalMenit <= 1260) jenisAbsen = "Absen Sholat Isya Berjamaah";
+
+                payload.kategori = "agenda";
+                payload.kegiatan = jenisAbsen;
+                payload.catatan = "Hadir Berjamaah";
+            } 
+            else if (kat === 'tahfidz') {
+                const jenisSetoran = document.getElementById('scan-tahfidz-jenis').value;
+                const status = document.getElementById('scan-tahfidz-status').value;
+                const surat = document.getElementById('scan-tahfidz-surat').value.trim();
+                const ayat = document.getElementById('scan-tahfidz-ayat').value.trim();
+
+                if (!surat) {
+                    alert("Mohon isi Nama Surat / Juz terlebih dahulu!");
+                    return;
+                }
+
+                payload.kategori = "tahfidz";
+                payload.jenisSetoran = jenisSetoran;
+                payload.status = status;
+                payload.surat = surat;
+                payload.ayat = ayat || "-";
+            } 
+            else if (kat === 'sunnah') {
+                const jenisAmalan = document.getElementById('scan-sunnah-jenis').value;
+                payload.kategori = "sunnah";
+                payload.amalan = jenisAmalan;
+                payload.keterangan = "Rutin Dikerjakan";
+            } 
+            else if (kat === 'agenda') {
+                const kegiatan = document.getElementById('scan-agenda-jenis').value;
+                const catatan = document.getElementById('scan-agenda-catatan').value.trim();
+                payload.kategori = "agenda";
+                payload.kegiatan = kegiatan;
+                payload.catatan = catatan || "Selesai / Aktif";
             }
 
-            if (window.simpanAktivitasScan) {
-                window.simpanAktivitasScan(currentScannedSantri, finalAktivitas, detail);
-                document.getElementById('scan-detail-ket').value = "";
+            if (window.simpanCatatanMusrifCloud) {
+                window.simpanCatatanMusrifCloud(payload);
                 document.getElementById('interactive-scan-box').classList.add('hidden');
                 currentScannedSantri = "";
             }
