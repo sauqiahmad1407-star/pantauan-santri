@@ -42,7 +42,7 @@
                     kelas: kelas,
                     nisn: nisn,
                     asrama: asrama,
-                    status: "Aktif",
+                    keteranganAbsen: "Hadir", // Default Hadir/Aktif
                     waktuDibuat: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
                     timestamp: Date.now()
                 });
@@ -67,19 +67,19 @@
             }
         };
 
-        // Fungsi Update Status Khusus Santri (Aktif / Sakit / Pulang) oleh Musrif
-        window.updateStatusSantriCloud = async function(docId, statusBaru) {
+        // Fungsi Update Keterangan Absen Khusus (Sakit / Pulang) di Panel Musrif
+        window.updateKeteranganAbsenCloud = async function(docId, keteranganBaru) {
             try {
                 const docRef = doc(db, "data_santri", docId);
                 await updateDoc(docRef, {
-                    status: statusBaru,
-                    waktuUpdateStatus: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+                    keteranganAbsen: keteranganBaru,
+                    waktuUpdateKet: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
                 });
-                alert("Berhasil! Keterangan / status santri diperbarui menjadi: " + statusBaru);
+                alert("Berhasil! Keterangan santri diperbarui menjadi: " + keteranganBaru);
                 window.muatDaftarSantriDariCloud();
             } catch (e) {
-                console.error("Gagal memperbarui status santri: ", e);
-                alert("Gagal memperbarui status.");
+                console.error("Gagal memperbarui keterangan: ", e);
+                alert("Gagal memperbarui keterangan santri.");
             }
         };
 
@@ -113,14 +113,15 @@
                     statistikKelas[kelasKey].total++;
 
                     const inisial = data.nama.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
+                    const ketAbsen = data.keteranganAbsen || "Hadir";
 
-                    // Penyesuaian warna badge berdasarkan status (Aktif, Sakit, Pulang)
+                    // Warna badge keterangan santri
                     let badgeColor = "bg-emerald-100 text-emerald-800";
-                    if (data.status === "Sakit") badgeColor = "bg-amber-100 text-amber-800";
-                    else if (data.status === "Pulang") badgeColor = "bg-blue-100 text-blue-800";
+                    if (ketAbsen === "Sakit") badgeColor = "bg-amber-100 text-amber-800";
+                    else if (ketAbsen === "Pulang / Izin") badgeColor = "bg-blue-100 text-blue-800";
 
                     htmlList += `
-                        <div onclick="openDetailSantri('${data.nama}', '${data.kelas}', 'NISN: ${data.nisn}', '${data.asrama}', '${data.status}')" class="santri-card p-4 bg-soft-cream rounded-xl border border-[#E3D5C9] cursor-pointer hover:border-primary-brown transition-all">
+                        <div onclick="openDetailSantri('${data.nama}', '${data.kelas}', 'NISN: ${data.nisn}', '${data.asrama}', '${ketAbsen}')" class="santri-card p-4 bg-soft-cream rounded-xl border border-[#E3D5C9] cursor-pointer hover:border-primary-brown transition-all">
                             <div class="flex justify-between items-start">
                                 <div class="flex items-center gap-3">
                                     <div class="w-10 h-10 rounded-full bg-primary-brown text-white flex items-center justify-center font-bold text-sm">${inisial}</div>
@@ -129,7 +130,7 @@
                                         <p class="text-[11px] text-gray-600">${data.kelas} • ${data.asrama}</p>
                                     </div>
                                 </div>
-                                <span class="text-[10px] ${badgeColor} px-2.5 py-0.5 rounded-full font-bold">${data.status || 'Aktif'}</span>
+                                <span class="text-[10px] ${badgeColor} px-2.5 py-0.5 rounded-full font-bold">${ketAbsen}</span>
                             </div>
                         </div>
                     `;
@@ -138,15 +139,15 @@
                         <div class="kelola-item-row p-3 bg-white rounded-xl border border-cream flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
                             <div>
                                 <span class="font-bold text-primary-brown block">${data.nama}</span>
-                                <span class="text-[10px] text-gray-500">${data.kelas} • ${data.asrama} (Status Saat Ini: <b>${data.status || 'Aktif'}</b>)</span>
+                                <span class="text-[10px] text-gray-500">${data.kelas} • ${data.asrama}</span>
                             </div>
-                            <div class="flex items-center gap-1.5 flex-wrap">
-                                <select onchange="updateStatusSantriCloud('${docId}', this.value)" class="text-[10px] px-2 py-1 rounded border border-cream bg-soft-cream font-bold text-primary-brown">
-                                    <option value="Aktif" ${data.status === 'Aktif' ? 'selected' : ''}>Aktif</option>
-                                    <option value="Sakit" ${data.status === 'Sakit' ? 'selected' : ''}>Sakit</option>
-                                    <option value="Pulang" ${data.status === 'Pulang' ? 'selected' : ''}>Pulang / Izin</option>
+                            <div class="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end">
+                                <select onchange="updateKeteranganAbsenCloud('${docId}', this.value)" class="text-[10px] px-2.5 py-1.5 rounded-lg border border-cream bg-soft-cream font-bold text-primary-brown">
+                                    <option value="Hadir" ${ketAbsen === 'Hadir' ? 'selected' : ''}>Hadir (Normal)</option>
+                                    <option value="Sakit" ${ketAbsen === 'Sakit' ? 'selected' : ''}>Sakit (Tidak Masuk)</option>
+                                    <option value="Pulang / Izin" ${ketAbsen === 'Pulang / Izin' ? 'selected' : ''}>Pulang / Izin</option>
                                 </select>
-                                <button onclick="hapusSantriCloud('${docId}', '${data.nama}')" class="bg-rose-100 text-rose-700 hover:bg-rose-200 font-bold px-2 py-1 rounded transition-colors text-[10px]">
+                                <button onclick="hapusSantriCloud('${docId}', '${data.nama}')" class="bg-rose-100 text-rose-700 hover:bg-rose-200 font-bold px-2.5 py-1.5 rounded-lg transition-colors text-[10px]">
                                     <i class="fa-solid fa-user-minus"></i> Hapus
                                 </button>
                             </div>
@@ -493,9 +494,9 @@
                         <h2 id="det-nama" class="text-lg font-bold text-primary-brown mt-1">Nama Santri</h2>
                         <p id="det-info" class="text-xs text-gray-600">Kelas & Asrama</p>
                     </div>
-                    <!-- Badge Keterangan Status Khusus (Aktif / Sakit / Pulang) di Header Profil -->
+                    <!-- Badge Keterangan Ketidakhadiran (Sakit / Pulang / Hadir) -->
                     <span id="det-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                        Aktif
+                        Hadir
                     </span>
                 </div>
 
@@ -672,7 +673,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2 pt-2">
                     <button onclick="pilihPeran('musrif')" class="p-3 bg-soft-cream border border-cream rounded-xl hover:border-primary-brown text-xs font-bold text-primary-brown transition-all">
-                        <i class="fa-solid fa-user-plus block text-lg mb-1"></i> Musrif (Kelola Status & Santri)
+                        <i class="fa-solid fa-user-plus block text-lg mb-1"></i> Musrif (Keterangan & Santri)
                     </button>
                     <button onclick="pilihPeran('bendahara')" class="p-3 bg-soft-cream border border-cream rounded-xl hover:border-primary-brown text-xs font-bold text-primary-brown transition-all">
                         <i class="fa-solid fa-wallet block text-lg mb-1"></i> Bendahara Keuangan
@@ -697,18 +698,28 @@
                 </div>
             </div>
 
-            <!-- Panel Musrif (Dilengkapi Ubah Status Sakit/Pulang & Pendaftaran) -->
+            <!-- Panel Musrif (Tempat Terpusat Atur Keterangan Sakit/Pulang & Pendaftaran Santri) -->
             <div id="musrif-form-box" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-5 hidden">
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <div>
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                            <i class="fa-solid fa-user-graduate"></i> Panel Musrif: Manajemen Santri & Keterangan
+                            <i class="fa-solid fa-user-graduate"></i> Panel Musrif: Keterangan Santri & Manajemen
                         </h3>
-                        <p class="text-xs text-gray-600 mt-0.5">Ubah status santri (Aktif, Sakit, Pulang) atau tambah/hapus data.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">Atur keterangan santri yang tidak terabsenkan (Sakit / Pulang) di sini.</p>
                     </div>
                     <button onclick="lockPanel()" class="text-[10px] bg-rose-100 text-rose-800 font-bold px-2.5 py-1.5 rounded-lg hover:bg-rose-200">
                         <i class="fa-solid fa-lock mr-1"></i> Keluar
                     </button>
+                </div>
+
+                <!-- Bagian Keterangan Khusus Ketidakhadiran (Sakit / Pulang / Izin) -->
+                <div class="space-y-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-bold text-xs text-amber-950"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Keterangan Santri Tidak Hadir (Sakit / Pulang)</h4>
+                        <input type="text" id="search-kelola-santri" onkeyup="filterKelolaSantri()" placeholder="Cari santri..." class="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-white focus:outline-none w-48">
+                    </div>
+                    <p class="text-[11px] text-amber-900">Ubah status santri menjadi <b>Sakit</b> atau <b>Pulang / Izin</b> agar rekapitulasi harian mencatat alasan ketidakhadiran mereka.</p>
+                    <div id="list-kelola-santri-container" class="space-y-2 max-h-60 overflow-y-auto"></div>
                 </div>
 
                 <div class="space-y-3 bg-soft-cream p-4 rounded-xl border border-[#E3D5C9]">
@@ -734,16 +745,6 @@
                     <button onclick="tambahSantriBaruSubmit()" class="w-full bg-primary-brown text-white text-xs font-bold py-2.5 rounded-lg hover:bg-[#4A3228]">
                         <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Simpan Santri Baru ke Cloud
                     </button>
-                </div>
-
-                <!-- Bagian Kelola Status (Sakit / Pulang / Aktif) & Hapus Santri -->
-                <div class="space-y-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
-                    <div class="flex justify-between items-center">
-                        <h4 class="font-bold text-xs text-amber-950"><i class="fa-solid fa-clipboard-user mr-1"></i> Kelola Keterangan Status (Sakit / Pulang)</h4>
-                        <input type="text" id="search-kelola-santri" onkeyup="filterKelolaSantri()" placeholder="Cari santri..." class="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-white focus:outline-none w-48">
-                    </div>
-                    <p class="text-[11px] text-amber-900">Ubah status santri menjadi Sakit atau Pulang/Izin apabila santri sedang tidak berada di kelas/pondok.</p>
-                    <div id="list-kelola-santri-container" class="space-y-2 max-h-56 overflow-y-auto"></div>
                 </div>
             </div>
 
@@ -1010,19 +1011,19 @@
             document.getElementById('sholat-status-grid').innerHTML = html;
         }
 
-        function openDetailSantri(nama, kelas, nisn, asrama, status) {
+        function openDetailSantri(nama, kelas, nisn, asrama, ketAbsen) {
             document.getElementById('santri-list-view').classList.add('hidden');
             document.getElementById('santri-detail-view').classList.remove('hidden');
             document.getElementById('det-nama').innerText = nama;
             document.getElementById('det-nisn').innerText = nisn + " • " + asrama;
             document.getElementById('det-info').innerText = "Kelas: " + kelas;
 
-            // Atur warna dan teks badge status di profil detail santri
+            // Atur badge status ketidakhadiran di profil santri
             const badgeEl = document.getElementById('det-status-badge');
-            badgeEl.innerText = status || 'Aktif';
-            if (status === 'Sakit') {
+            badgeEl.innerText = ketAbsen;
+            if (ketAbsen === 'Sakit') {
                 badgeEl.className = "px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800";
-            } else if (status === 'Pulang') {
+            } else if (ketAbsen === 'Pulang / Izin') {
                 badgeEl.className = "px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800";
             } else {
                 badgeEl.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800";
@@ -1048,15 +1049,15 @@
             if (window.cacheDataSantri && window.cacheDataSantri.length > 0) {
                 let html = "";
                 window.cacheDataSantri.forEach((s, idx) => {
-                    let st = s.status || 'Aktif';
-                    let stColor = st === 'Aktif' ? 'bg-emerald-100 text-emerald-800' : (st === 'Sakit' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800');
+                    let ket = s.keteranganAbsen || 'Hadir';
+                    let badgeBg = ket === 'Hadir' ? 'bg-emerald-100 text-emerald-800' : (ket === 'Sakit' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800');
                     html += `
                         <div class="p-3 bg-soft-cream rounded-xl border border-cream flex justify-between items-center text-xs">
                             <div>
                                 <span class="font-bold text-primary-brown">${idx + 1}. ${s.nama}</span>
                                 <span class="block text-[11px] text-gray-600">Kelas: ${s.kelas} • ${s.asrama}</span>
                             </div>
-                            <span class="${stColor} px-2 py-0.5 rounded font-bold text-[10px]">${st}</span>
+                            <span class="${badgeBg} px-2 py-0.5 rounded font-bold text-[10px]">${ket}</span>
                         </div>
                     `;
                 });
@@ -1130,7 +1131,7 @@
             selectedRole = role;
             document.getElementById('role-select-box').classList.add('hidden');
             document.getElementById('pin-login-box').classList.remove('hidden');
-            const title = role === 'musrif' ? "PIN Musrif (Kelola Status & Santri)" : "PIN Bendahara Keuangan";
+            const title = role === 'musrif' ? "PIN Musrif (Keterangan & Manajemen)" : "PIN Bendahara Keuangan";
             document.getElementById('label-role-title').innerText = title;
         }
 
@@ -1150,7 +1151,7 @@
                 document.getElementById('pin-login-box').classList.add('hidden');
                 document.getElementById('musrif-form-box').classList.remove('hidden');
                 document.getElementById('input-pin-role').value = "";
-                window.muatDaftarSantriDariCloud(); // Refresh list kelola
+                window.muatDaftarSantriDariCloud();
             } else if (selectedRole === 'bendahara' && pinInput === pinBendahara) {
                 document.getElementById('pin-login-box').classList.add('hidden');
                 document.getElementById('bendahara-form-box').classList.remove('hidden');
