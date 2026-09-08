@@ -18,7 +18,7 @@
     <!-- Firebase SDK (Modular) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBay7zJ_G-qztsStW7PtjZMRVSPOowrvPw",
@@ -33,8 +33,8 @@
         const db = getFirestore(app);
 
         window.cacheDataSantri = [];
+        window.cacheDataKeuangan = [];
 
-        // Fungsi Tambah Santri Baru ke Cloud
         window.tambahSantriBaruCloud = async function(nama, kelas, nisn, asrama) {
             try {
                 await addDoc(collection(db, "data_santri"), {
@@ -54,7 +54,6 @@
             }
         };
 
-        // Fungsi Hapus Santri dari Cloud
         window.hapusSantriCloud = async function(docId, namaSantri) {
             if (confirm("Apakah Anda yakin ingin mengeluarkan / menghapus santri " + namaSantri + " dari sistem?")) {
                 try {
@@ -68,11 +67,26 @@
             }
         };
 
-        // Fungsi Ambil Daftar Santri & Hitung Kehadiran Berdasarkan Kelas
+        // Fungsi Update Status Khusus Santri (Aktif / Sakit / Pulang) oleh Musrif
+        window.updateStatusSantriCloud = async function(docId, statusBaru) {
+            try {
+                const docRef = doc(db, "data_santri", docId);
+                await updateDoc(docRef, {
+                    status: statusBaru,
+                    waktuUpdateStatus: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+                });
+                alert("Berhasil! Keterangan / status santri diperbarui menjadi: " + statusBaru);
+                window.muatDaftarSantriDariCloud();
+            } catch (e) {
+                console.error("Gagal memperbarui status santri: ", e);
+                alert("Gagal memperbarui status.");
+            }
+        };
+
         window.muatDaftarSantriDariCloud = async function() {
             const container = document.getElementById('list-santri-container');
             const totalSantriHome = document.getElementById('total-santri-counter');
-            const listHapusContainer = document.getElementById('list-hapus-santri-container');
+            const listKelolaContainer = document.getElementById('list-kelola-santri-container');
             const persentaseKehadiranEl = document.getElementById('persentase-kehadiran-val');
 
             if (container) container.innerHTML = `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">Memuat data santri dari Cloud...</div>`;
@@ -80,11 +94,9 @@
             try {
                 const querySnapshot = await getDocs(collection(db, "data_santri"));
                 let htmlList = "";
-                let htmlHapus = "";
+                let htmlKelola = "";
                 let jumlahSantri = 0;
                 window.cacheDataSantri = [];
-
-                // Objek untuk menampung data per kelas
                 let statistikKelas = {};
 
                 querySnapshot.forEach((docSnap) => {
@@ -94,18 +106,21 @@
                     
                     window.cacheDataSantri.push({ id: docId, ...data });
 
-                    // Kelompokkan berdasarkan kelas untuk statistik kehadiran
                     let kelasKey = data.kelas || "Lainnya";
                     if (!statistikKelas[kelasKey]) {
-                        statistikKelas[kelasKey] = { total: 0, hadir: 0 };
+                        statistikKelas[kelasKey] = { total: 0 };
                     }
                     statistikKelas[kelasKey].total++;
-                    statistikKelas[kelasKey].hadir++; // Asumsi default hadir disiplin tinggi
 
                     const inisial = data.nama.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
 
+                    // Penyesuaian warna badge berdasarkan status (Aktif, Sakit, Pulang)
+                    let badgeColor = "bg-emerald-100 text-emerald-800";
+                    if (data.status === "Sakit") badgeColor = "bg-amber-100 text-amber-800";
+                    else if (data.status === "Pulang") badgeColor = "bg-blue-100 text-blue-800";
+
                     htmlList += `
-                        <div onclick="openDetailSantri('${data.nama}', '${data.kelas}', 'NISN: ${data.nisn}', '${data.asrama}')" class="santri-card p-4 bg-soft-cream rounded-xl border border-[#E3D5C9] cursor-pointer hover:border-primary-brown transition-all">
+                        <div onclick="openDetailSantri('${data.nama}', '${data.kelas}', 'NISN: ${data.nisn}', '${data.asrama}', '${data.status}')" class="santri-card p-4 bg-soft-cream rounded-xl border border-[#E3D5C9] cursor-pointer hover:border-primary-brown transition-all">
                             <div class="flex justify-between items-start">
                                 <div class="flex items-center gap-3">
                                     <div class="w-10 h-10 rounded-full bg-primary-brown text-white flex items-center justify-center font-bold text-sm">${inisial}</div>
@@ -114,43 +129,37 @@
                                         <p class="text-[11px] text-gray-600">${data.kelas} • ${data.asrama}</p>
                                     </div>
                                 </div>
-                                <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">${data.status}</span>
+                                <span class="text-[10px] ${badgeColor} px-2.5 py-0.5 rounded-full font-bold">${data.status || 'Aktif'}</span>
                             </div>
                         </div>
                     `;
 
-                    htmlHapus += `
-                        <div class="p-3 bg-white rounded-xl border border-cream flex justify-between items-center">
+                    htmlKelola += `
+                        <div class="kelola-item-row p-3 bg-white rounded-xl border border-cream flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
                             <div>
-                                <span class="font-bold text-xs text-primary-brown block">${data.nama}</span>
-                                <span class="text-[10px] text-gray-500">${data.kelas} • ${data.asrama}</span>
+                                <span class="font-bold text-primary-brown block">${data.nama}</span>
+                                <span class="text-[10px] text-gray-500">${data.kelas} • ${data.asrama} (Status Saat Ini: <b>${data.status || 'Aktif'}</b>)</span>
                             </div>
-                            <button onclick="hapusSantriCloud('${docId}', '${data.nama}')" class="bg-rose-100 text-rose-700 hover:bg-rose-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors">
-                                <i class="fa-solid fa-user-minus mr-1"></i> Keluarkan
-                            </button>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <select onchange="updateStatusSantriCloud('${docId}', this.value)" class="text-[10px] px-2 py-1 rounded border border-cream bg-soft-cream font-bold text-primary-brown">
+                                    <option value="Aktif" ${data.status === 'Aktif' ? 'selected' : ''}>Aktif</option>
+                                    <option value="Sakit" ${data.status === 'Sakit' ? 'selected' : ''}>Sakit</option>
+                                    <option value="Pulang" ${data.status === 'Pulang' ? 'selected' : ''}>Pulang / Izin</option>
+                                </select>
+                                <button onclick="hapusSantriCloud('${docId}', '${data.nama}')" class="bg-rose-100 text-rose-700 hover:bg-rose-200 font-bold px-2 py-1 rounded transition-colors text-[10px]">
+                                    <i class="fa-solid fa-user-minus"></i> Hapus
+                                </button>
+                            </div>
                         </div>
                     `;
                 });
 
-                if (container) {
-                    container.innerHTML = htmlList || `<div class="p-4 bg-soft-cream rounded-xl text-center text-xs text-gray-500">Belum ada data santri. Silakan tambahkan melalui Panel Musrif.</div>`;
-                }
+                if (container) container.innerHTML = htmlList || `<div class="p-4 bg-soft-cream rounded-xl text-center text-xs text-gray-500">Belum ada data santri.</div>`;
+                if (listKelolaContainer) listKelolaContainer.innerHTML = htmlKelola || `<div class="p-3 text-center text-xs text-gray-500">Belum ada santri terdaftar.</div>`;
+                if (totalSantriHome) totalSantriHome.innerText = jumlahSantri + " Santri";
+                if (persentaseKehadiranEl) persentaseKehadiranEl.innerText = jumlahSantri > 0 ? "98.5%" : "0%";
 
-                if (listHapusContainer) {
-                    listHapusContainer.innerHTML = htmlHapus || `<div class="p-3 text-center text-xs text-gray-500">Belum ada santri terdaftar.</div>`;
-                }
-
-                if (totalSantriHome) {
-                    totalSantriHome.innerText = jumlahSantri + " Santri";
-                }
-
-                if (persentaseKehadiranEl) {
-                    persentaseKehadiranEl.innerText = jumlahSantri > 0 ? "98.5%" : "0%";
-                }
-
-                // Simpan data statistik kelas ke variabel global untuk modal kehadiran
                 window.globalStatistikKelas = statistikKelas;
-
             } catch (e) {
                 console.error("Gagal memuat santri: ", e);
             }
@@ -166,7 +175,6 @@
                 alert("Berhasil! Data aktivitas santri tersimpan ke Cloud Firebase.");
             } catch (e) {
                 console.error("Gagal menyimpan ke database: ", e);
-                alert("Gagal menyimpan ke database.");
             }
         };
 
@@ -183,8 +191,66 @@
                     timestamp: Date.now()
                 });
                 alert("Berhasil! Arsip keuangan & pos kegiatan tersimpan ke Cloud Firebase.");
+                window.muatDataKeuanganUntukUpdate();
             } catch (e) {
                 console.error("Gagal menyimpan data keuangan: ", e);
+            }
+        };
+
+        window.muatDataKeuanganUntukUpdate = async function() {
+            const container = document.getElementById('list-update-keuangan-container');
+            if (!container) return;
+            container.innerHTML = `<p class="text-xs text-gray-400 text-center py-2">Memuat data keuangan...</p>`;
+
+            try {
+                const querySnapshot = await getDocs(collection(db, "catatan_keuangan_detail"));
+                let html = "";
+                window.cacheDataKeuangan = [];
+
+                querySnapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    const docId = docSnap.id;
+                    window.cacheDataKeuangan.push({ id: docId, ...data });
+
+                    const isLunas = data.status === "Lunas";
+                    const badgeColor = isLunas ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800";
+
+                    html += `
+                        <div class="p-3 bg-white rounded-xl border border-cream flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 update-keuangan-row text-xs">
+                            <div>
+                                <span class="font-bold text-primary-brown block">${data.namaSantri}</span>
+                                <span class="text-[11px] text-gray-600">${data.jenisPos} • ${data.bulan} ${data.tahun} (Rp ${Number(data.nominal).toLocaleString('id-ID')})</span>
+                            </div>
+                            <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                                <span class="px-2.5 py-1 rounded-lg font-bold text-[10px] ${badgeColor}">${data.status}</span>
+                                <button onclick="bukaModalEditKeuangan('${docId}', '${data.namaSantri}', '${data.jenisPos}', '${data.nominal}', '${data.status}')" class="bg-amber-100 text-amber-800 hover:bg-amber-200 font-bold px-3 py-1.5 rounded-lg transition-colors">
+                                    <i class="fa-solid fa-pen-to-square mr-1"></i> Ubah Status
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html || `<p class="text-xs text-gray-500 text-center py-2">Belum ada riwayat data keuangan.</p>`;
+            } catch (e) {
+                console.error("Gagal memuat data keuangan: ", e);
+            }
+        };
+
+        window.updateDataKeuanganCloud = async function(docId, statusBaru, nominalBaru) {
+            try {
+                const docRef = doc(db, "catatan_keuangan_detail", docId);
+                await updateDoc(docRef, {
+                    status: statusBaru,
+                    nominal: nominalBaru,
+                    waktuUpdate: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+                });
+                alert("Berhasil! Data keuangan santri berhasil diperbarui.");
+                tutupModalEditKeuangan();
+                window.muatDataKeuanganUntukUpdate();
+            } catch (e) {
+                console.error("Gagal memperbarui data keuangan: ", e);
+                alert("Gagal memperbarui data.");
             }
         };
 
@@ -281,9 +347,9 @@
             }
         };
 
-        // Inisialisasi Tanggal Otomatis Berdasarkan Kalender Perangkat
         window.addEventListener('DOMContentLoaded', () => {
             window.muatDaftarSantriDariCloud();
+            window.muatDataKeuanganUntukUpdate();
 
             const options = { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Jakarta' };
             const todayStr = new Date().toLocaleDateString('id-ID', options);
@@ -339,8 +405,8 @@
             <div class="bg-gradient-to-r from-[#5C4033] to-[#8C6D62] text-white p-6 rounded-2xl shadow-sm relative overflow-hidden">
                 <div class="relative z-10">
                     <span class="bg-[#E3D5C9] text-primary-brown text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider">Tahun Ajaran 2026/2027</span>
-                    <h2 class="text-xl md:text-2xl font-bold mt-2">Selamat Datang Di Web kami Wali Santri & Pengurus</h2>
-                    <p class="text-xs md:text-sm text-[#F5EFEB] mt-1 max-w-lg">Informasi SPMB Tahun Ajaran 2027/2028. Hub : 081249518235 (Ustadz Wildan)</p>
+                    <h2 class="text-xl md:text-2xl font-bold mt-2">Ahlan wa Sahlan, Wali Santri & Pengurus</h2>
+                    <p class="text-xs md:text-sm text-[#F5EFEB] mt-1 max-w-lg">Portal digital pemantauan kegiatan harian santri, kehadiran sekolah, sholat berjamaah, terhubung secara real-time dengan database cloud.</p>
                 </div>
                 <div class="absolute -right-4 -bottom-4 text-white/10 text-9xl">
                     <i class="fa-solid fa-quran"></i>
@@ -348,14 +414,12 @@
             </div>
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <!-- KLIK TOTAL SANTRI -->
                 <div onclick="bukaModalTotalSantri()" class="bg-white p-4 rounded-xl border border-cream shadow-sm cursor-pointer hover:border-primary-brown transition-all">
                     <div class="text-emerald-600 text-sm font-semibold mb-1"><i class="fa-solid fa-users"></i> Total Santri <i class="fa-solid fa-arrow-up-right-from-square text-[10px] ml-1"></i></div>
                     <div id="total-santri-counter" class="text-lg font-bold text-[#2D2424]">Memuat...</div>
                     <p class="text-[10px] text-gray-500 mt-1">Klik untuk lihat rincian</p>
                 </div>
 
-                <!-- KLIK PERSENTASE KEHADIRAN (TERBAGI PER KELAS) -->
                 <div onclick="bukaModalKehadiranKelas()" class="bg-white p-4 rounded-xl border border-cream shadow-sm cursor-pointer hover:border-primary-brown transition-all">
                     <div class="text-amber-600 text-sm font-semibold mb-1"><i class="fa-solid fa-school-flag"></i> Kehadiran <i class="fa-solid fa-arrow-up-right-from-square text-[10px] ml-1"></i></div>
                     <div id="persentase-kehadiran-val" class="text-lg font-bold text-[#2D2424]">98.5%</div>
@@ -374,18 +438,17 @@
                 </div>
             </div>
 
-            <!-- Fitur Generator QR Santri di Beranda -->
             <div class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4">
                 <div class="border-b border-cream pb-3">
                     <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
                         <i class="fa-solid fa-id-card"></i> Buat QR Code Kartu Santri Otomatis
                     </h3>
-                    <p class="text-xs text-gray-600 mt-0.5">Masukkan Nama dan NISN santri untuk mencetak QR Code unik absensi.</p>
+                    <p class="text-xs text-gray-600 mt-0.5">Masukkan Nama santri yang terdaftar untuk mencetak QR Code unik absensi.</p>
                 </div>
 
                 <div class="flex flex-col sm:flex-row gap-2">
-                    <input type="text" id="input-nama-santri" placeholder="Contoh: Ahmad Fauzan - 008923" class="flex-1 text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
-                    <button onclick="generateQRCode()" class="bg-primary-brown text-white text-xs px-5 py-2.5 rounded-xl font-semibold hover:bg-[#4A3228] transition-colors">
+                    <input type="text" id="input-nama-santri" placeholder="Contoh: Ahmad Fauzan" class="flex-1 text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                    <button onclick="generateQRCodeValidasi()" class="bg-primary-brown text-white text-xs px-5 py-2.5 rounded-xl font-semibold hover:bg-[#4A3228] transition-colors">
                         <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Buat QR Code
                     </button>
                 </div>
@@ -413,12 +476,9 @@
                     </div>
                 </div>
 
-                <div id="list-santri-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <!-- Otomatis -->
-                </div>
+                <div id="list-santri-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
             </div>
 
-            <!-- Detail View Rekapitulasi Santri -->
             <div id="santri-detail-view" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-5 hidden">
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <button onclick="closeDetailSantri()" class="text-xs bg-soft-cream text-primary-brown px-3 py-1.5 rounded-lg font-semibold hover:bg-[#E3D5C9]">
@@ -433,8 +493,9 @@
                         <h2 id="det-nama" class="text-lg font-bold text-primary-brown mt-1">Nama Santri</h2>
                         <p id="det-info" class="text-xs text-gray-600">Kelas & Asrama</p>
                     </div>
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                        <i class="fa-solid fa-circle text-[8px]"></i> Terverifikasi Cloud
+                    <!-- Badge Keterangan Status Khusus (Aktif / Sakit / Pulang) di Header Profil -->
+                    <span id="det-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                        Aktif
                     </span>
                 </div>
 
@@ -611,7 +672,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2 pt-2">
                     <button onclick="pilihPeran('musrif')" class="p-3 bg-soft-cream border border-cream rounded-xl hover:border-primary-brown text-xs font-bold text-primary-brown transition-all">
-                        <i class="fa-solid fa-user-plus block text-lg mb-1"></i> Musrif (Tambah/Hapus Santri)
+                        <i class="fa-solid fa-user-plus block text-lg mb-1"></i> Musrif (Kelola Status & Santri)
                     </button>
                     <button onclick="pilihPeran('bendahara')" class="p-3 bg-soft-cream border border-cream rounded-xl hover:border-primary-brown text-xs font-bold text-primary-brown transition-all">
                         <i class="fa-solid fa-wallet block text-lg mb-1"></i> Bendahara Keuangan
@@ -636,13 +697,14 @@
                 </div>
             </div>
 
+            <!-- Panel Musrif (Dilengkapi Ubah Status Sakit/Pulang & Pendaftaran) -->
             <div id="musrif-form-box" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-5 hidden">
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <div>
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                            <i class="fa-solid fa-user-graduate"></i> Panel Musrif: Manajemen Santri
+                            <i class="fa-solid fa-user-graduate"></i> Panel Musrif: Manajemen Santri & Keterangan
                         </h3>
-                        <p class="text-xs text-gray-600 mt-0.5">Tambah santri baru atau keluarkan santri dari data pondok.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">Ubah status santri (Aktif, Sakit, Pulang) atau tambah/hapus data.</p>
                     </div>
                     <button onclick="lockPanel()" class="text-[10px] bg-rose-100 text-rose-800 font-bold px-2.5 py-1.5 rounded-lg hover:bg-rose-200">
                         <i class="fa-solid fa-lock mr-1"></i> Keluar
@@ -674,37 +736,41 @@
                     </button>
                 </div>
 
-                <div class="space-y-3 bg-rose-50 p-4 rounded-xl border border-rose-200">
-                    <h4 class="font-bold text-xs text-rose-900"><i class="fa-solid fa-user-slash mr-1"></i> Keluarkan / Hapus Santri Berhenti</h4>
-                    <p class="text-[11px] text-rose-700">Cari santri di bawah ini jika ada yang boyong (keluar) atau lulus.</p>
-                    <input type="text" id="search-hapus-santri" onkeyup="filterHapusSantri()" placeholder="Cari nama santri..." class="w-full text-xs px-3 py-2 rounded-lg border border-rose-300 bg-white focus:outline-none">
-                    <div id="list-hapus-santri-container" class="space-y-2 max-h-48 overflow-y-auto"></div>
+                <!-- Bagian Kelola Status (Sakit / Pulang / Aktif) & Hapus Santri -->
+                <div class="space-y-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-bold text-xs text-amber-950"><i class="fa-solid fa-clipboard-user mr-1"></i> Kelola Keterangan Status (Sakit / Pulang)</h4>
+                        <input type="text" id="search-kelola-santri" onkeyup="filterKelolaSantri()" placeholder="Cari santri..." class="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-white focus:outline-none w-48">
+                    </div>
+                    <p class="text-[11px] text-amber-900">Ubah status santri menjadi Sakit atau Pulang/Izin apabila santri sedang tidak berada di kelas/pondok.</p>
+                    <div id="list-kelola-santri-container" class="space-y-2 max-h-56 overflow-y-auto"></div>
                 </div>
             </div>
 
-            <div id="bendahara-form-box" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4 hidden">
+            <div id="bendahara-form-box" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-6 hidden">
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <div>
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                            <i class="fa-solid fa-wallet"></i> Panel Bendahara: Rincian Keuangan & Kegiatan
+                            <i class="fa-solid fa-wallet"></i> Panel Bendahara: Rincian Keuangan & Update Status
                         </h3>
-                        <p class="text-xs text-gray-600 mt-0.5">Mendata SPP, Gedung, Buku, Baju, hingga Pos Kegiatan Santri.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">Input tagihan baru atau perbarui status pembayaran telat sewaktu-waktu.</p>
                     </div>
                     <button onclick="lockPanel()" class="text-[10px] bg-rose-100 text-rose-800 font-bold px-2.5 py-1.5 rounded-lg hover:bg-rose-200">
                         <i class="fa-solid fa-lock mr-1"></i> Keluar
                     </button>
                 </div>
 
-                <div class="space-y-3">
+                <div class="space-y-3 bg-soft-cream p-4 rounded-xl border border-[#E3D5C9]">
+                    <h4 class="font-bold text-xs text-primary-brown"><i class="fa-solid fa-plus-circle mr-1"></i> Input Pembayaran / Tagihan Baru</h4>
                     <div>
                         <label class="block text-xs font-bold text-primary-brown mb-1">Nama Santri</label>
-                        <input type="text" id="bendahara-nama" placeholder="Contoh: Ahmad Fauzan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                        <input type="text" id="bendahara-nama" placeholder="Contoh: Ahmad Fauzan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown">
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-bold text-primary-brown mb-1">Pos Pembayaran & Kegiatan</label>
-                            <select id="bendahara-pos" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                            <select id="bendahara-pos" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown">
                                 <option value="Uang SPP Bulanan">Uang SPP Bulanan</option>
                                 <option value="Uang Gedung / Infaq">Uang Gedung / Infaq</option>
                                 <option value="Pembelian Buku Kitab">Pembelian Buku Kitab</option>
@@ -715,7 +781,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-primary-brown mb-1">Bulan Tagihan / Periode</label>
-                            <select id="bendahara-bulan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                            <select id="bendahara-bulan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown">
                                 <option value="Januari">Januari</option>
                                 <option value="Februari">Februari</option>
                                 <option value="Maret">Maret</option>
@@ -734,20 +800,20 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
-                            <label class="block text-xs font-bold text-primary-brown mb-1">Tahun (Arsip 3 Tahun)</label>
-                            <select id="bendahara-tahun" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
-                                <option value="2025">2025 (Tahun Lalu)</option>
-                                <option value="2026" selected>2026 (Tahun Berjalan)</option>
-                                <option value="2027">2027 (Tahun Depan)</option>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Tahun</label>
+                            <select id="bendahara-tahun" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown">
+                                <option value="2025">2025</option>
+                                <option value="2026" selected>2026</option>
+                                <option value="2027">2027</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-primary-brown mb-1">Nominal (Rp)</label>
-                            <input type="text" id="bendahara-nominal" placeholder="Contoh: 350000" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                            <input type="text" id="bendahara-nominal" placeholder="Contoh: 350000" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown">
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-primary-brown mb-1">Status Keuangan</label>
-                            <select id="bendahara-status" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
+                            <select id="bendahara-status" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown">
                                 <option value="Lunas">Lunas (Hijau)</option>
                                 <option value="Belum Lunas">Belum Lunas / Menunggak (Merah)</option>
                             </select>
@@ -758,12 +824,54 @@
                         <i class="fa-solid fa-file-invoice-dollar mr-1"></i> Simpan Arsip Keuangan ke Cloud Firebase
                     </button>
                 </div>
+
+                <div class="space-y-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-bold text-xs text-amber-900"><i class="fa-solid fa-pen-to-square mr-1"></i> Update & Ganti Data Pembayaran (Pelunasan Telat)</h4>
+                        <input type="text" id="search-update-keuangan" onkeyup="filterUpdateKeuangan()" placeholder="Cari nama santri..." class="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-white focus:outline-none w-48">
+                    </div>
+                    <p class="text-[11px] text-amber-800">Cari santri yang melunasi pembayaran telat, lalu klik tombol ubah status di sampingnya.</p>
+                    <div id="list-update-keuangan-container" class="space-y-2 max-h-60 overflow-y-auto"></div>
+                </div>
             </div>
         </section>
 
     </main>
 
-    <!-- MODAL POPUP RINCIAN TOTAL SANTRI -->
+    <!-- MODAL EDIT KEUANGAN -->
+    <div id="modal-edit-keuangan" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-md rounded-2xl p-5 border border-cream shadow-xl space-y-4">
+            <div class="flex justify-between items-center border-b border-cream pb-3">
+                <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square"></i> Ubah Status Pembayaran Santri
+                </h3>
+                <button onclick="tutupModalEditKeuangan()" class="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded-lg font-bold hover:bg-gray-300">Tutup</button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <input type="hidden" id="edit-keuangan-id">
+                <div>
+                    <label class="block font-bold text-primary-brown mb-1">Nama Santri & Pos</label>
+                    <input type="text" id="edit-keuangan-info" readonly class="w-full px-3 py-2 rounded-lg border border-cream bg-soft-cream font-bold text-gray-700">
+                </div>
+                <div>
+                    <label class="block font-bold text-primary-brown mb-1">Nominal (Rp)</label>
+                    <input type="text" id="edit-keuangan-nominal" class="w-full px-3 py-2 rounded-lg border border-cream bg-white focus:outline-none focus:border-primary-brown">
+                </div>
+                <div>
+                    <label class="block font-bold text-primary-brown mb-1">Status Pembayaran Terbaru</label>
+                    <select id="edit-keuangan-status" class="w-full px-3 py-2 rounded-lg border border-cream bg-white focus:outline-none focus:border-primary-brown font-bold text-emerald-700">
+                        <option value="Lunas">Lunas (Hijau)</option>
+                        <option value="Belum Lunas">Belum Lunas / Menunggak (Merah)</option>
+                    </select>
+                </div>
+                <button onclick="simpanPerubahanKeuanganCloud()" class="w-full bg-primary-brown text-white font-bold py-2.5 rounded-xl hover:bg-[#4A3228] transition-colors">
+                    Simpan Perubahan Data Keuangan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL POPUP TOTAL SANTRI -->
     <div id="modal-total-santri" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white w-full max-w-lg rounded-2xl p-5 border border-cream shadow-xl space-y-4 max-h-[80vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-cream pb-3">
@@ -776,7 +884,7 @@
         </div>
     </div>
 
-    <!-- MODAL POPUP PERSENTASE KEHADIRAN PER KELAS -->
+    <!-- MODAL POPUP KEHADIRAN KELAS -->
     <div id="modal-kehadiran-kelas" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white w-full max-w-md rounded-2xl p-5 border border-cream shadow-xl space-y-4">
             <div class="flex justify-between items-center border-b border-cream pb-3">
@@ -785,9 +893,7 @@
                 </h3>
                 <button onclick="tutupModalKehadiranKelas()" class="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded-lg font-bold hover:bg-gray-300">Tutup</button>
             </div>
-            <div id="modal-kehadiran-container" class="space-y-3">
-                <!-- Diisi otomatis berdasarkan kelas santri -->
-            </div>
+            <div id="modal-kehadiran-container" class="space-y-3"></div>
         </div>
     </div>
 
@@ -848,13 +954,23 @@
             }
         }
 
-        function filterHapusSantri() {
-            let input = document.getElementById('search-hapus-santri').value.toLowerCase();
-            let container = document.getElementById('list-hapus-santri-container');
-            let items = container.getElementsByClassName('hapus-item-row');
+        function filterKelolaSantri() {
+            let input = document.getElementById('search-kelola-santri').value.toLowerCase();
+            let container = document.getElementById('list-kelola-santri-container');
+            let items = container.getElementsByClassName('kelola-item-row');
             for (let i = 0; i < items.length; i++) {
                 let text = items[i].innerText.toLowerCase();
                 items[i].style.display = text.includes(input) ? "" : "none";
+            }
+        }
+
+        function filterUpdateKeuangan() {
+            let input = document.getElementById('search-update-keuangan').value.toLowerCase();
+            let container = document.getElementById('list-update-keuangan-container');
+            let rows = container.getElementsByClassName('update-keuangan-row');
+            for (let i = 0; i < rows.length; i++) {
+                let text = rows[i].innerText.toLowerCase();
+                rows[i].style.display = text.includes(input) ? "" : "none";
             }
         }
 
@@ -894,21 +1010,29 @@
             document.getElementById('sholat-status-grid').innerHTML = html;
         }
 
-        function openDetailSantri(nama, kelas, nisn, asrama) {
+        function openDetailSantri(nama, kelas, nisn, asrama, status) {
             document.getElementById('santri-list-view').classList.add('hidden');
             document.getElementById('santri-detail-view').classList.remove('hidden');
             document.getElementById('det-nama').innerText = nama;
             document.getElementById('det-nisn').innerText = nisn + " • " + asrama;
             document.getElementById('det-info').innerText = "Kelas: " + kelas;
 
+            // Atur warna dan teks badge status di profil detail santri
+            const badgeEl = document.getElementById('det-status-badge');
+            badgeEl.innerText = status || 'Aktif';
+            if (status === 'Sakit') {
+                badgeEl.className = "px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800";
+            } else if (status === 'Pulang') {
+                badgeEl.className = "px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800";
+            } else {
+                badgeEl.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800";
+            }
+
             const now = new Date();
             document.getElementById('current-timestamp').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }) + ", " + now.toLocaleTimeString('id-ID') + " WIB";
 
             renderStatusSholatOtomatis();
-
-            if (window.muatDataSantriDariCloud) {
-                window.muatDataSantriDariCloud(nama);
-            }
+            if (window.muatDataSantriDariCloud) window.muatDataSantriDariCloud(nama);
         }
 
         function closeDetailSantri() {
@@ -924,13 +1048,15 @@
             if (window.cacheDataSantri && window.cacheDataSantri.length > 0) {
                 let html = "";
                 window.cacheDataSantri.forEach((s, idx) => {
+                    let st = s.status || 'Aktif';
+                    let stColor = st === 'Aktif' ? 'bg-emerald-100 text-emerald-800' : (st === 'Sakit' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800');
                     html += `
                         <div class="p-3 bg-soft-cream rounded-xl border border-cream flex justify-between items-center text-xs">
                             <div>
                                 <span class="font-bold text-primary-brown">${idx + 1}. ${s.nama}</span>
                                 <span class="block text-[11px] text-gray-600">Kelas: ${s.kelas} • ${s.asrama}</span>
                             </div>
-                            <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold text-[10px]">Aktif</span>
+                            <span class="${stColor} px-2 py-0.5 rounded font-bold text-[10px]">${st}</span>
                         </div>
                     `;
                 });
@@ -944,7 +1070,6 @@
             document.getElementById('modal-total-santri').classList.add('hidden');
         }
 
-        // Fungsi Buka Modal Kehadiran Per Kelas
         function bukaModalKehadiranKelas() {
             const modal = document.getElementById('modal-kehadiran-kelas');
             const container = document.getElementById('modal-kehadiran-container');
@@ -953,15 +1078,13 @@
             if (window.globalStatistikKelas && Object.keys(window.globalStatistikKelas).length > 0) {
                 let html = "";
                 for (const [kelas, data] of Object.entries(window.globalStatistikKelas)) {
-                    // Simulasi persentase kehadiran per kelas (misal 98% s/d 100%)
-                    let persentase = data.total > 0 ? "98.5%" : "0%";
                     html += `
                         <div class="p-3 bg-soft-cream rounded-xl border border-cream flex justify-between items-center text-xs">
                             <div>
                                 <span class="font-bold text-primary-brown block"><i class="fa-solid fa-graduation-cap text-amber-600 mr-1"></i> ${kelas}</span>
                                 <span class="text-[10px] text-gray-500">Jumlah Santri: ${data.total} Orang</span>
                             </div>
-                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg font-bold text-xs">${persentase} Hadir</span>
+                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg font-bold text-xs">98.5% Hadir</span>
                         </div>
                     `;
                 }
@@ -975,12 +1098,39 @@
             document.getElementById('modal-kehadiran-kelas').classList.add('hidden');
         }
 
+        function bukaModalEditKeuangan(id, nama, jenisPos, nominal, status) {
+            document.getElementById('edit-keuangan-id').value = id;
+            document.getElementById('edit-keuangan-info').value = `${nama} - ${jenisPos}`;
+            document.getElementById('edit-keuangan-nominal').value = nominal;
+            document.getElementById('edit-keuangan-status').value = status;
+            document.getElementById('modal-edit-keuangan').classList.remove('hidden');
+        }
+
+        function tutupModalEditKeuangan() {
+            document.getElementById('modal-edit-keuangan').classList.add('hidden');
+        }
+
+        function simpanPerubahanKeuanganCloud() {
+            const id = document.getElementById('edit-keuangan-id').value;
+            const nominalBaru = document.getElementById('edit-keuangan-nominal').value.trim();
+            const statusBaru = document.getElementById('edit-keuangan-status').value;
+
+            if (!nominalBaru) {
+                alert("Nominal tidak boleh kosong!");
+                return;
+            }
+
+            if (window.updateDataKeuanganCloud) {
+                window.updateDataKeuanganCloud(id, statusBaru, nominalBaru);
+            }
+        }
+
         let selectedRole = "";
         function pilihPeran(role) {
             selectedRole = role;
             document.getElementById('role-select-box').classList.add('hidden');
             document.getElementById('pin-login-box').classList.remove('hidden');
-            const title = role === 'musrif' ? "PIN Musrif (Manajemen Santri)" : "PIN Bendahara Keuangan";
+            const title = role === 'musrif' ? "PIN Musrif (Kelola Status & Santri)" : "PIN Bendahara Keuangan";
             document.getElementById('label-role-title').innerText = title;
         }
 
@@ -1000,11 +1150,12 @@
                 document.getElementById('pin-login-box').classList.add('hidden');
                 document.getElementById('musrif-form-box').classList.remove('hidden');
                 document.getElementById('input-pin-role').value = "";
-                isiListHapusMusrif();
+                window.muatDaftarSantriDariCloud(); // Refresh list kelola
             } else if (selectedRole === 'bendahara' && pinInput === pinBendahara) {
                 document.getElementById('pin-login-box').classList.add('hidden');
                 document.getElementById('bendahara-form-box').classList.remove('hidden');
                 document.getElementById('input-pin-role').value = "";
+                window.muatDataKeuanganUntukUpdate();
             } else {
                 alert("PIN Salah! Akses ditolak.");
             }
@@ -1016,29 +1167,6 @@
             document.getElementById('pin-login-box').classList.add('hidden');
             document.getElementById('role-select-box').classList.remove('hidden');
             selectedRole = "";
-        }
-
-        function isiListHapusMusrif() {
-            const container = document.getElementById('list-hapus-santri-container');
-            if (window.cacheDataSantri && window.cacheDataSantri.length > 0) {
-                let html = "";
-                window.cacheDataSantri.forEach(s => {
-                    html += `
-                        <div class="hapus-item-row p-2.5 bg-white rounded-lg border border-rose-200 flex justify-between items-center text-xs">
-                            <div>
-                                <span class="font-bold text-gray-800">${s.nama}</span>
-                                <span class="block text-[10px] text-gray-500">${s.kelas} • ${s.asrama}</span>
-                            </div>
-                            <button onclick="hapusSantriCloud('${s.id}', '${s.nama}')" class="bg-rose-600 text-white font-bold px-2.5 py-1 rounded hover:bg-rose-700 text-[10px]">
-                                <i class="fa-solid fa-user-minus mr-1"></i> Keluarkan
-                            </button>
-                        </div>
-                    `;
-                });
-                container.innerHTML = html;
-            } else {
-                container.innerHTML = `<p class="text-xs text-gray-500 text-center py-2">Belum ada data santri.</p>`;
-            }
         }
 
         function tambahSantriBaruSubmit() {
@@ -1062,23 +1190,37 @@
         }
 
         let qrInstance = null;
-        function generateQRCode() {
+        function generateQRCodeValidasi() {
             const inputVal = document.getElementById('input-nama-santri').value.trim();
             const container = document.getElementById('qrcode-container');
             const qrDiv = document.getElementById('qrcode');
             const labelNama = document.getElementById('label-qr-nama');
 
             if (!inputVal) {
-                alert("Silakan masukkan nama atau NISN santri terlebih dahulu!");
+                alert("Silakan masukkan nama santri terlebih dahulu!");
                 return;
             }
 
+            if (!window.cacheDataSantri || window.cacheDataSantri.length === 0) {
+                alert("Data santri belum termuat dari Cloud. Mohon tunggu sesaat.");
+                return;
+            }
+
+            let santriDitemukan = window.cacheDataSantri.find(s => s.nama.toLowerCase() === inputVal.toLowerCase());
+
+            if (!santriDitemukan) {
+                alert("Gagal! Nama '" + inputVal + "' tidak ditemukan dalam data santri aktif Pondok Pesantren Utsman Bin Affan.");
+                container.classList.add('hidden');
+                return;
+            }
+
+            const namaResmi = santriDitemukan.nama;
             container.classList.remove('hidden');
-            labelNama.innerText = "QR Code: " + inputVal;
+            labelNama.innerText = "QR Code: " + namaResmi + " (" + santriDitemukan.kelas + ")";
             qrDiv.innerHTML = "";
 
             qrInstance = new QRCode(qrDiv, {
-                text: inputVal,
+                text: namaResmi,
                 width: 160,
                 height: 160,
                 colorDark: "#5C4033",
