@@ -54,7 +54,6 @@
             }
         };
 
-        // Fungsi Edit Data Santri (Tanpa Hapus)
         window.editSantriCloud = async function(docId, namaBaru, kelasBaru, nisnBaru, asramaBaru) {
             try {
                 const docRef = doc(db, "data_santri", docId);
@@ -475,12 +474,13 @@
                 </div>
             </div>
 
+            <!-- Bagian Buat & Unduh QR Code Santri -->
             <div class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4">
                 <div class="border-b border-cream pb-3">
                     <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-id-card"></i> Buat QR Code Kartu Santri Otomatis
+                        <i class="fa-solid fa-id-card"></i> Buat & Unduh QR Code Kartu Santri
                     </h3>
-                    <p class="text-xs text-gray-600 mt-0.5">Masukkan Nama santri yang terdaftar untuk mencetak QR Code unik absensi.</p>
+                    <p class="text-xs text-gray-600 mt-0.5">Masukkan nama santri yang terdaftar untuk mencetak atau mengunduh QR Code permanen.</p>
                 </div>
 
                 <div class="flex flex-col sm:flex-row gap-2">
@@ -493,7 +493,10 @@
                 <div id="qrcode-container" class="flex flex-col items-center justify-center p-4 bg-soft-cream rounded-xl border border-cream hidden">
                     <p id="label-qr-nama" class="font-bold text-sm text-primary-brown mb-3 text-center"></p>
                     <div id="qrcode" class="bg-white p-3 rounded-lg shadow-sm"></div>
-                    <p class="text-[10px] text-gray-500 mt-2 text-center">Scan QR ini menggunakan menu 'Scan Absen' untuk mencatat kehadiran otomatis.</p>
+                    <button onclick="unduhQrCodeSantri()" class="mt-3 bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-emerald-800 transition-colors shadow-sm">
+                        <i class="fa-solid fa-download mr-1"></i> Unduh Gambar QR Code (.png)
+                    </button>
+                    <p class="text-[10px] text-gray-500 mt-2 text-center">QR Code ini bersifat permanen dan sama setiap kali dibuat untuk nama yang sama.</p>
                 </div>
             </div>
         </section>
@@ -573,40 +576,167 @@
             </div>
         </section>
 
-        <!-- 3. MENU SCAN QR ABSENSI CEPAT & BERUNTUN LENGKAP -->
+        <!-- 3. MENU SCAN ABSEN -->
         <section id="menu-scan" class="space-y-6 hidden">
-            <div class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4 text-center">
-                <div class="border-b border-cream pb-3 text-left">
-                    <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-qrcode"></i> Scan QR Code Cepat Beruntun (Semua Kegiatan Pesantren)
-                    </h3>
-                    <p class="text-xs text-gray-600 mt-0.5">Sesi aktif (Sholat, Kajian Sore/Malam, Piket, Tahfidz Pagi/Sore, Muhadhoroh) diatur oleh Musrif.</p>
-                </div>
-
-                <div id="active-session-banner" class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-left flex justify-between items-center text-xs">
+            <div class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4">
+                <div class="border-b border-cream pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <div>
-                        <span class="text-amber-900 font-bold block"><i class="fa-solid fa-bullhorn mr-1"></i> Sesi Aktif Saat Ini:</span>
-                        <span id="label-sesi-aktif" class="text-primary-brown font-bold text-sm">Memuat Sesi...</span>
+                        <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
+                            <i class="fa-solid fa-qrcode"></i> Menu Utama Scan Absen Pesantren
+                        </h3>
+                        <p class="text-xs text-gray-600 mt-0.5">Pilih tipe scan sesuai jenis kegiatan santri.</p>
                     </div>
-                    <button onclick="muatSesiAktifScan()" class="bg-amber-200 text-amber-900 px-3 py-1.5 rounded-lg font-bold hover:bg-amber-300">
-                        <i class="fa-solid fa-rotate mr-1"></i> Refresh Sesi
-                    </button>
+                    <div class="flex bg-soft-cream p-1 rounded-xl border border-cream text-xs">
+                        <button onclick="pilihTipeScan('cepat')" id="btn-tipe-cepat" class="px-3 py-1.5 rounded-lg font-bold bg-primary-brown text-white shadow-sm transition-all">
+                            <i class="fa-solid fa-bolt mr-1"></i> Scan Cepat Beruntun
+                        </button>
+                        <button onclick="pilihTipeScan('biasa')" id="btn-tipe-biasa" class="px-3 py-1.5 rounded-lg font-bold text-gray-700 hover:text-primary-brown transition-all">
+                            <i class="fa-solid fa-hand-pointer mr-1"></i> Scan Biasa (Interaktif)
+                        </button>
+                    </div>
                 </div>
 
-                <div id="fast-scan-alert" class="p-4 rounded-xl border hidden text-center transition-all animate-bounce">
-                    <p id="fast-scan-msg" class="font-bold text-sm"></p>
+                <!-- TIPE 1: SCAN CEPAT BERUNTUN -->
+                <div id="container-scan-cepat" class="space-y-4 text-center">
+                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-left flex justify-between items-center text-xs">
+                        <div>
+                            <span class="text-amber-900 font-bold block"><i class="fa-solid fa-bullhorn mr-1"></i> Sesi Cepat Aktif Saat Ini (Diatur Musrif):</span>
+                            <span id="label-sesi-aktif" class="text-primary-brown font-bold text-sm">Memuat Sesi...</span>
+                        </div>
+                        <button onclick="muatSesiAktifScan()" class="bg-amber-200 text-amber-900 px-3 py-1.5 rounded-lg font-bold hover:bg-amber-300">
+                            <i class="fa-solid fa-rotate mr-1"></i> Refresh
+                        </button>
+                    </div>
+
+                    <div id="fast-scan-alert" class="p-4 rounded-xl border hidden text-center transition-all animate-bounce">
+                        <p id="fast-scan-msg" class="font-bold text-sm"></p>
+                    </div>
+
+                    <div class="py-2">
+                        <button onclick="startFastQrScanner()" class="bg-primary-brown text-white text-xs font-semibold px-6 py-3.5 rounded-xl hover:bg-[#4A3228] transition-colors shadow-sm inline-flex items-center gap-2">
+                            <i class="fa-solid fa-camera"></i> Nyalakan Kamera Scan Cepat Beruntun
+                        </button>
+                        <button onclick="stopFastQrScanner()" class="bg-gray-200 text-gray-700 text-xs font-semibold px-5 py-3.5 rounded-xl hover:bg-gray-300 transition-colors shadow-sm ml-2">
+                            Tutup Kamera
+                        </button>
+                    </div>
+
+                    <div id="reader-cepat" class="w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-cream hidden"></div>
                 </div>
 
-                <div class="py-3">
-                    <button onclick="startFastQrScanner()" class="bg-primary-brown text-white text-xs font-semibold px-6 py-3.5 rounded-xl hover:bg-[#4A3228] transition-colors shadow-sm inline-flex items-center gap-2">
-                        <i class="fa-solid fa-camera"></i> Nyalakan Kamera Scanner Beruntun
-                    </button>
-                    <button onclick="stopFastQrScanner()" class="bg-gray-200 text-gray-700 text-xs font-semibold px-5 py-3.5 rounded-xl hover:bg-gray-300 transition-colors shadow-sm ml-2">
-                        Tutup Kamera
-                    </button>
+                <!-- TIPE 2: SCAN BIASA / INTERAKTIF -->
+                <div id="container-scan-biasa" class="space-y-4 hidden text-center">
+                    <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-left text-xs text-blue-900">
+                        <i class="fa-solid fa-circle-info mr-1"></i> <b>Scan Biasa (Interaktif):</b> Pilih kegiatan khusus (Sholat Dhuha, Puasa, Muhadhoroh, atau Tahfidz) setelah scan kartu santri.
+                    </div>
+
+                    <div class="py-2">
+                        <button onclick="startNormalQrScanner()" class="bg-primary-brown text-white text-xs font-semibold px-5 py-3 rounded-xl hover:bg-[#4A3228] transition-colors shadow-sm inline-flex items-center gap-2">
+                            <i class="fa-solid fa-camera"></i> Mulai Kamera Scan Biasa
+                        </button>
+                        <button onclick="stopNormalQrScanner()" class="bg-gray-200 text-gray-700 text-xs font-semibold px-5 py-3 rounded-xl hover:bg-gray-300 transition-colors shadow-sm ml-2">
+                            Tutup Kamera
+                        </button>
+                    </div>
+
+                    <div id="reader-biasa" class="w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-cream hidden"></div>
+
+                    <div id="interactive-scan-box" class="hidden p-5 bg-blue-50 border border-blue-200 rounded-2xl text-left space-y-4">
+                        <div class="flex items-center justify-between border-b border-blue-200 pb-2">
+                            <span class="text-xs font-bold text-blue-950"><i class="fa-solid fa-user-check mr-1"></i> Santri Terdeteksi:</span>
+                            <span id="scanned-santri-name" class="text-xs font-bold bg-blue-200 text-blue-950 px-2.5 py-0.5 rounded-full">-</span>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Kegiatan Santai / Khusus:</label>
+                            <select id="scan-kategori-pilih" onchange="gantiFormScan()" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown font-semibold text-primary-brown">
+                                <option value="sunnah">1. Amalan Sunnah & Puasa (Dhuha, Senin-Kamis, Daud, dll)</option>
+                                <option value="tahfidz">2. Setoran Tahfidz (Ziyadah / Murojaah / Imtihan)</option>
+                                <option value="agenda">3. Kegiatan Khusus (Muhadhoroh, Al-Kahfi, Dzikir)</option>
+                            </select>
+                        </div>
+
+                        <div id="subform-sunnah" class="space-y-2">
+                            <label class="block text-[11px] font-bold text-primary-brown mb-1">Pilih Amalan Sunnah / Puasa</label>
+                            <select id="scan-sunnah-jenis" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                <option value="Sholat Dhuha">Sholat Dhuha</option>
+                                <option value="Puasa Senin-Kamis">Puasa Senin-Kamis</option>
+                                <option value="Puasa Daud">Puasa Daud</option>
+                                <option value="Qobliyah Subuh">Qobliyah Subuh</option>
+                                <option value="Ba'diyah Dzuhur">Ba'diyah Dzuhur</option>
+                                <option value="Ba'diyah Maghrib">Ba'diyah Maghrib</option>
+                                <option value="Ba'diyah Isya">Ba'diyah Isya</option>
+                            </select>
+                        </div>
+
+                        <div id="subform-tahfidz" class="space-y-3 hidden">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Jenis Setoran</label>
+                                    <select id="scan-tahfidz-jenis" onchange="gantiJenisTahfidz()" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                        <option value="Ziyadah (Hafalan Baru)">Ziyadah (Hafalan Baru)</option>
+                                        <option value="Murojaah (Pengulangan)">Murojaah (Pengulangan)</option>
+                                        <option value="Imtihan (Ujian / Tasmi')">Imtihan (Ujian / Tasmi')</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Kelancaran</label>
+                                    <select id="scan-tahfidz-status" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                        <option value="Lancar (Mumtaz)">Lancar (Mumtaz)</option>
+                                        <option value="Cukup Lancar (Jayyid)">Cukup Lancar (Jayyid)</option>
+                                        <option value="Perlu Diulang (Muraja'ah)">Perlu Diulang (Muraja'ah)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="tahfidz-ziyadah-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Nama Surat / Juz</label>
+                                    <input type="text" id="scan-tahfidz-surat" placeholder="Contoh: An-Naba" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Rentang Ayat</label>
+                                    <input type="text" id="scan-tahfidz-ayat" placeholder="Contoh: Ayat 1-15" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                </div>
+                            </div>
+
+                            <div id="tahfidz-murojaah-fields" class="space-y-2 hidden">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-primary-brown mb-1">Dari Surat Awal</label>
+                                        <input type="text" id="scan-murojaah-dari" placeholder="An-Nazi'at" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-primary-brown mb-1">Sampai Surat Akhir</label>
+                                        <input type="text" id="scan-murojaah-sampai" placeholder="An-Naba" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Rentang Ayat / Keterangan</label>
+                                    <input type="text" id="scan-murojaah-ayat" placeholder="Selesai / Ayat 1-40" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="subform-agenda" class="space-y-2 hidden">
+                            <label class="block text-[11px] font-bold text-primary-brown mb-1">Pilih Kegiatan Khusus</label>
+                            <select id="scan-agenda-jenis" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                <option value="Muhadhoroh">Muhadhoroh</option>
+                                <option value="Membaca Surat Al-Kahfi di Hari Jumat">Membaca Surat Al-Kahfi di Hari Jumat</option>
+                                <option value="Berdoa di Petang Jumat">Berdoa di Petang Jumat</option>
+                                <option value="Dzikir Pagi & Petang">Dzikir Pagi & Petang</option>
+                                <option value="Kajian Kitab Kuning">Kajian Kitab Kuning</option>
+                            </select>
+                            <input type="text" id="scan-agenda-catatan" placeholder="Catatan tambahan (Opsional)" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white mt-1">
+                        </div>
+
+                        <div class="flex gap-2 pt-2">
+                            <button onclick="batalScanInteraktif()" class="w-1/3 bg-gray-200 text-gray-700 text-xs font-bold py-2.5 rounded-xl hover:bg-gray-300">Batal</button>
+                            <button onclick="kirimAktivitasScanCloudNormal()" class="w-2/3 bg-primary-brown text-white text-xs font-bold py-2.5 rounded-xl hover:bg-[#4A3228]">Simpan ke Cloud</button>
+                        </div>
+                    </div>
                 </div>
 
-                <div id="reader" class="w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-cream hidden"></div>
             </div>
         </section>
 
@@ -622,7 +752,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2 pt-2">
                     <button onclick="pilihPeran('musrif')" class="p-3 bg-soft-cream border border-cream rounded-xl hover:border-primary-brown text-xs font-bold text-primary-brown transition-all">
-                        <i class="fa-solid fa-user-plus block text-lg mb-1"></i> Musrif (Sesi, Edit & Santri)
+                        <i class="fa-solid fa-user-plus block text-lg mb-1"></i> Musrif (Sesi Cepat & Santri)
                     </button>
                     <button onclick="pilihPeran('bendahara')" class="p-3 bg-soft-cream border border-cream rounded-xl hover:border-primary-brown text-xs font-bold text-primary-brown transition-all">
                         <i class="fa-solid fa-wallet block text-lg mb-1"></i> Bendahara Keuangan
@@ -647,25 +777,24 @@
                 </div>
             </div>
 
-            <!-- Panel Musrif: Pengaturan Sesi Lengkap + Edit & Hapus Santri -->
+            <!-- Panel Musrif -->
             <div id="musrif-form-box" class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-5 hidden">
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <div>
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                            <i class="fa-solid fa-bullhorn"></i> Panel Musrif: Sesi Scan & Edit Data Santri
+                            <i class="fa-solid fa-bullhorn"></i> Panel Musrif: Sesi Scan Cepat & Edit Santri
                         </h3>
-                        <p class="text-xs text-gray-600 mt-0.5">Atur sesi kegiatan lengkap, edit nama/NISN, atau ubah keterangan sakit/pulang.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">Atur sesi scan cepat (Sholat & Kajian), edit nama/NISN, atau status sakit/pulang.</p>
                     </div>
                     <button onclick="lockPanel()" class="text-[10px] bg-rose-100 text-rose-800 font-bold px-2.5 py-1.5 rounded-lg hover:bg-rose-200">
                         <i class="fa-solid fa-lock mr-1"></i> Keluar
                     </button>
                 </div>
 
-                <!-- Pengaturan Sesi Kegiatan Lengkap -->
                 <div class="space-y-3 bg-soft-cream p-4 rounded-xl border border-[#E3D5C9]">
-                    <h4 class="font-bold text-xs text-primary-brown"><i class="fa-solid fa-gear mr-1"></i> Pilih Sesi Kegiatan Scan Cepat</h4>
+                    <h4 class="font-bold text-xs text-primary-brown"><i class="fa-solid fa-gear mr-1"></i> Seting Sesi Aktif untuk Menu 'Scan Cepat'</h4>
                     <div>
-                        <label class="block text-xs font-bold text-primary-brown mb-1">Daftar Sholat & Kegiatan Pondok</label>
+                        <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Sholat & Kajian</label>
                         <select id="setting-sesi-kegiatan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown font-bold text-primary-brown">
                             <optgroup label="Sholat Wajib Berjamaah">
                                 <option value="Absen Sholat Subuh Berjamaah">Absen Sholat Subuh Berjamaah</option>
@@ -674,23 +803,23 @@
                                 <option value="Absen Sholat Maghrib Berjamaah">Absen Sholat Maghrib Berjamaah</option>
                                 <option value="Absen Sholat Isya Berjamaah">Absen Sholat Isya Berjamaah</option>
                             </optgroup>
-                            <optgroup label="Kegiatan & Ta'lim Pesantren">
-                                <option value="Tahfidz Pagi">Tahfidz Pagi</option>
-                                <option value="Tahfidz Sore">Tahfidz Sore</option>
+                            <optgroup label="Sholat Sunnah & Kajian Cepat">
+                                <option value="Sholat Dhuha">Sholat Dhuha</option>
+                                <option value="Qobliyah Subuh">Qobliyah Subuh</option>
+                                <option value="Ba'diyah Dzuhur">Ba'diyah Dzuhur</option>
+                                <option value="Ba'diyah Maghrib">Ba'diyah Maghrib</option>
+                                <option value="Ba'diyah Isya">Ba'diyah Isya</option>
                                 <option value="Kajian Sore">Kajian Sore</option>
                                 <option value="Kajian Malam">Kajian Malam</option>
-                                <option value="Piket Kebersihan Asrama">Piket Kebersihan Asrama</option>
-                                <option value="Muhadhoroh">Muhadhoroh</option>
                             </optgroup>
                         </select>
                     </div>
                     <button onclick="simpanSesiAktifMusrif()" class="w-full bg-primary-brown text-white text-xs font-bold py-2.5 rounded-xl hover:bg-[#4A3228]">
                         <i class="fa-solid fa-floppy-disk mr-1"></i> Aktifkan Sesi Ini (Santri Siap Scan Cepat)
                     </button>
-                    <p class="text-[10px] text-gray-500 text-center">Status Sesi Aktif Saat Ini: <b id="text-status-sesi-aktif" class="text-emerald-700">-</b></p>
+                    <p class="text-[10px] text-gray-500 text-center">Status Sesi Cepat Aktif: <b id="text-status-sesi-aktif" class="text-emerald-700">-</b></p>
                 </div>
 
-                <!-- Bagian Kelola Data Santri (Edit & Keterangan Sakit/Pulang & Hapus) -->
                 <div class="space-y-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
                     <div class="flex justify-between items-center">
                         <h4 class="font-bold text-xs text-amber-950"><i class="fa-solid fa-address-book mr-1"></i> Kelola Data, Edit & Keterangan Santri</h4>
@@ -958,10 +1087,33 @@
             activeSpan.classList.add('font-semibold');
 
             stopFastQrScanner();
+            stopNormalQrScanner();
             if (tabName === 'scan') {
                 muatSesiAktifScan();
             }
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function pilihTipeScan(tipe) {
+            const btnCepat = document.getElementById('btn-tipe-cepat');
+            const btnBiasa = document.getElementById('btn-tipe-biasa');
+            const containerCepat = document.getElementById('container-scan-cepat');
+            const containerBiasa = document.getElementById('container-scan-biasa');
+
+            if (tipe === 'cepat') {
+                btnCepat.className = "px-3 py-1.5 rounded-lg font-bold bg-primary-brown text-white shadow-sm transition-all";
+                btnBiasa.className = "px-3 py-1.5 rounded-lg font-bold text-gray-700 hover:text-primary-brown transition-all";
+                containerCepat.classList.remove('hidden');
+                containerBiasa.classList.add('hidden');
+                stopNormalQrScanner();
+                muatSesiAktifScan();
+            } else {
+                btnBiasa.className = "px-3 py-1.5 rounded-lg font-bold bg-primary-brown text-white shadow-sm transition-all";
+                btnCepat.className = "px-3 py-1.5 rounded-lg font-bold text-gray-700 hover:text-primary-brown transition-all";
+                containerBiasa.classList.remove('hidden');
+                containerCepat.classList.add('hidden');
+                stopFastQrScanner();
+            }
         }
 
         function filterSantri() {
@@ -993,7 +1145,6 @@
             }
         }
 
-        // Jadwal Sholat Dinamis Berdasarkan Bulan Berjalan
         function renderStatusSholatOtomatis() {
             const now = new Date();
             const bulan = now.getMonth(); 
@@ -1120,7 +1271,6 @@
             document.getElementById('modal-kehadiran-kelas').classList.add('hidden');
         }
 
-        // Fungsi Buka / Tutup Modal Edit Santri
         function bukaModalEditSantri(id, nama, kelas, nisn, asrama) {
             document.getElementById('edit-santri-id').value = id;
             document.getElementById('edit-santri-nama').value = nama;
@@ -1183,7 +1333,7 @@
             selectedRole = role;
             document.getElementById('role-select-box').classList.add('hidden');
             document.getElementById('pin-login-box').classList.remove('hidden');
-            const title = role === 'musrif' ? "PIN Musrif (Sesi, Edit & Santri)" : "PIN Bendahara Keuangan";
+            const title = role === 'musrif' ? "PIN Musrif (Sesi Cepat & Santri)" : "PIN Bendahara Keuangan";
             document.getElementById('label-role-title').innerText = title;
         }
 
@@ -1246,7 +1396,7 @@
         function simpanSesiAktifMusrif() {
             const sesiPilih = document.getElementById('setting-sesi-kegiatan').value;
             localStorage.setItem('sesi_aktif_pesantren', sesiPilih);
-            alert("Berhasil! Sesi aktif diatur ke: " + sesiPilih + ". Santri siap melakukan scan cepat beruntun.");
+            alert("Berhasil! Sesi scan cepat diatur ke: " + sesiPilih + ". Santri siap melakukan scan cepat beruntun.");
             muatSesiAktifMusrifUI();
         }
 
@@ -1304,6 +1454,32 @@
             });
         }
 
+        // Fitur Unduh QR Code sebagai File Gambar PNG
+        function unduhQrCodeSantri() {
+            const qrCanvas = document.querySelector('#qrcode canvas');
+            const qrImage = document.querySelector('#qrcode img');
+            const labelNama = document.getElementById('label-qr-nama').innerText;
+
+            let imageUrl = "";
+            if (qrCanvas) {
+                imageUrl = qrCanvas.toDataURL("image/png");
+            } else if (qrImage) {
+                imageUrl = qrImage.src;
+            }
+
+            if (!imageUrl) {
+                alert("QR Code belum dibuat!");
+                return;
+            }
+
+            const downloadLink = document.createElement('a');
+            downloadLink.href = imageUrl;
+            downloadLink.download = `QR_Card_${labelNama.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }
+
         function kirimDataBendaharaDetail() {
             const nama = document.getElementById('bendahara-nama').value.trim();
             const pos = document.getElementById('bendahara-pos').value;
@@ -1324,17 +1500,140 @@
             }
         }
 
-        // Scanner QR Cepat Beruntun (Semua Kegiatan + Notifikasi Sukses / Double Scan)
+        function gantiFormScan() {
+            const kat = document.getElementById('scan-kategori-pilih').value;
+            document.getElementById('subform-sunnah').classList.add('hidden');
+            document.getElementById('subform-tahfidz').classList.add('hidden');
+            document.getElementById('subform-agenda').classList.add('hidden');
+            document.getElementById('subform-' + kat).classList.remove('hidden');
+        }
+
+        function gantiJenisTahfidz() {
+            const jenis = document.getElementById('scan-tahfidz-jenis').value;
+            const fieldZiyadah = document.getElementById('tahfidz-ziyadah-fields');
+            const fieldMurojaah = document.getElementById('tahfidz-murojaah-fields');
+
+            if (jenis.includes('Ziyadah')) {
+                fieldZiyadah.classList.remove('hidden');
+                fieldMurojaah.classList.add('hidden');
+            } else {
+                fieldZiyadah.classList.add('hidden');
+                fieldMurojaah.classList.remove('hidden');
+            }
+        }
+
+        let currentScannedSantriNormal = "";
+        let normalQrCodeScanner = null;
+
+        function startNormalQrScanner() {
+            const readerDiv = document.getElementById('reader-biasa');
+            readerDiv.classList.remove('hidden');
+            document.getElementById('interactive-scan-box').classList.add('hidden');
+
+            if (!normalQrCodeScanner) {
+                normalQrCodeScanner = new Html5Qrcode("reader-biasa");
+            }
+            
+            normalQrCodeScanner.start(
+                { facingMode: "environment" }, 
+                { fps: 10, qrbox: { width: 200, height: 200 } },
+                (decodedText, decodedResult) => {
+                    stopNormalQrScanner();
+                    currentScannedSantriNormal = decodedText;
+
+                    document.getElementById('scanned-santri-name').innerText = decodedText;
+                    document.getElementById('interactive-scan-box').classList.remove('hidden');
+                    gantiFormScan();
+                    gantiJenisTahfidz();
+                },
+                (errorMessage) => {}
+            ).catch((err) => {
+                alert("Tidak dapat mengakses kamera. Pastikan izin kamera aktif.");
+            });
+        }
+
+        function stopNormalQrScanner() {
+            if (normalQrCodeScanner) {
+                normalQrCodeScanner.stop().then(() => {
+                    document.getElementById('reader-biasa').classList.add('hidden');
+                }).catch(() => {
+                    document.getElementById('reader-biasa').classList.add('hidden');
+                });
+            } else {
+                document.getElementById('reader-biasa').classList.add('hidden');
+            }
+        }
+
+        function batalScanInteraktif() {
+            document.getElementById('interactive-scan-box').classList.add('hidden');
+            currentScannedSantriNormal = "";
+        }
+
+        async function kirimAktivitasScanCloudNormal() {
+            const kat = document.getElementById('scan-kategori-pilih').value;
+            let payload = { namaSantri: currentScannedSantriNormal };
+
+            if (kat === 'sunnah') {
+                const jenisAmalan = document.getElementById('scan-sunnah-jenis').value;
+                payload.kategori = "sunnah";
+                payload.amalan = jenisAmalan;
+                payload.keterangan = "Rutin Dikerjakan";
+            } 
+            else if (kat === 'tahfidz') {
+                const jenisSetoran = document.getElementById('scan-tahfidz-jenis').value;
+                const status = document.getElementById('scan-tahfidz-status').value;
+
+                payload.kategori = "tahfidz";
+                payload.jenisSetoran = jenisSetoran;
+                payload.status = status;
+
+                if (jenisSetoran.includes('Ziyadah')) {
+                    const surat = document.getElementById('scan-tahfidz-surat').value.trim();
+                    const ayat = document.getElementById('scan-tahfidz-ayat').value.trim();
+                    if (!surat) {
+                        alert("Mohon isi Nama Surat / Juz terlebih dahulu!");
+                        return;
+                    }
+                    payload.surat = surat;
+                    payload.ayat = ayat || "-";
+                } else {
+                    const dariSurat = document.getElementById('scan-murojaah-dari').value.trim();
+                    const sampaiSurat = document.getElementById('scan-murojaah-sampai').value.trim();
+                    const ayatMurojaah = document.getElementById('scan-murojaah-ayat').value.trim();
+                    if (!dariSurat || !sampaiSurat) {
+                        alert("Mohon isi rentang Surat Awal dan Surat Akhir terlebih dahulu!");
+                        return;
+                    }
+                    payload.surat = `Dari Surat ${dariSurat} s/d ${sampaiSurat}`;
+                    payload.ayat = ayatMurojaah || "Selesai";
+                }
+            } 
+            else if (kat === 'agenda') {
+                const kegiatan = document.getElementById('scan-agenda-jenis').value;
+                const catatan = document.getElementById('scan-agenda-catatan').value.trim();
+                payload.kategori = "agenda";
+                payload.kegiatan = kegiatan;
+                payload.catatan = catatan || "Selesai / Aktif";
+            }
+
+            if (window.simpanCatatanMusrifCloud) {
+                let res = await window.simpanCatatanMusrifCloud(payload);
+                alert(res.pesan);
+                document.getElementById('interactive-scan-box').classList.add('hidden');
+                currentScannedSantriNormal = "";
+            }
+        }
+
         let fastQrCodeScanner = null;
         let isProcessingScan = false;
 
         function startFastQrScanner() {
-            const readerDiv = document.getElementById('reader');
+            const readerDiv = document.getElementById('reader-cepat');
             readerDiv.classList.remove('hidden');
             muatSesiAktifScan();
 
             if (!fastQrCodeScanner) {
-                fastQrCodeScanner = new Html5Qrcode("reader");
+                fastQrCodeScanner = new Html5Qrcode("reader-cepat");
             }
             
             fastQrCodeScanner.start(
@@ -1347,11 +1646,15 @@
                     const sesiAktif = localStorage.getItem('sesi_aktif_pesantren') || "Absen Sholat Subuh Berjamaah";
                     
                     let kategoriTipe = sesiAktif.includes("Sholat") ? "sholat" : "agenda";
+                    if (sesiAktif.includes("Dhuha") || sesiAktif.includes("Qobliyah") || sesiAktif.includes("Ba'diyah")) {
+                        kategoriTipe = "sunnah";
+                    }
+
                     let payload = {
                         namaSantri: decodedText,
                         kategori: kategoriTipe,
                         kegiatan: sesiAktif,
-                        catatan: "Hadir / Selesai Berjamaah"
+                        catatan: "Hadir / Selesai (Scan Cepat)"
                     };
 
                     const alertBox = document.getElementById('fast-scan-alert');
@@ -1369,7 +1672,6 @@
                             alertMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-700 text-lg mr-1"></i> <b>SUDAH ABSEN!</b><br>${decodedText} sudah berhasil absen sebelumnya.`;
                         }
 
-                        // Jeda 2 detik agar santri di belakangnya bisa langsung scan berikutnya
                         setTimeout(() => {
                             alertBox.classList.add('hidden');
                             isProcessingScan = false;
@@ -1386,12 +1688,12 @@
         function stopFastQrScanner() {
             if (fastQrCodeScanner) {
                 fastQrCodeScanner.stop().then(() => {
-                    document.getElementById('reader').classList.add('hidden');
+                    document.getElementById('reader-cepat').classList.add('hidden');
                 }).catch(() => {
-                    document.getElementById('reader').classList.add('hidden');
+                    document.getElementById('reader-cepat').classList.add('hidden');
                 });
             } else {
-                document.getElementById('reader').classList.add('hidden');
+                document.getElementById('reader-cepat').classList.add('hidden');
             }
             isProcessingScan = false;
         }
