@@ -34,6 +34,8 @@
 
         window.cacheDataSantri = [];
         window.cacheDataKeuangan = [];
+        window.cacheRawMusrif = [];
+        window.currentSelectedSantriName = "";
 
         window.tambahSantriBaruCloud = async function(nama, kelas, nisn, asrama) {
             try {
@@ -74,11 +76,12 @@
         };
 
         window.hapusSantriCloud = async function(docId, namaSantri) {
-            if (confirm("Apakah Anda yakin ingin mengeluarkan / menghapus santri " + namaSantri + " dari sistem?")) {
+            if (confirm("Apakah Anda yakin ingin mengeluarkan / menghapus santri " + namaSantri + " dari sistem? (Catatan: Rekapitulasi & riwayat keuangannya juga akan otomatis disembunyikan)")) {
                 try {
                     await deleteDoc(doc(db, "data_santri", docId));
                     alert("Santri " + namaSantri + " berhasil dikeluarkan dari data pesantren.");
                     window.muatDaftarSantriDariCloud();
+                    window.muatDataKeuanganUntukUpdate();
                 } catch (e) {
                     console.error("Gagal menghapus santri: ", e);
                     alert("Gagal menghapus data santri.");
@@ -138,7 +141,7 @@
                     else if (ketAbsen === "Pulang / Izin") badgeColor = "bg-blue-100 text-blue-800";
 
                     htmlList += `
-                        <div onclick="openDetailSantri('${data.nama}', '${data.kelas}', 'NISN: ${data.nisn}', '${data.asrama}', '${ketAbsen}')" class="santri-card p-4 bg-soft-cream rounded-xl border border-[#E3D5C9] cursor-pointer hover:border-primary-brown transition-all">
+                        <div onclick="openDetailSantri('${data.nama.replace(/'/g, "\\'")}', '${data.kelas.replace(/'/g, "\\'")}', 'NISN: ${data.nisn || '-'}', '${data.asrama.replace(/'/g, "\\'")}', '${ketAbsen}')" class="santri-card p-4 bg-soft-cream rounded-xl border border-[#E3D5C9] cursor-pointer hover:border-primary-brown transition-all">
                             <div class="flex justify-between items-start">
                                 <div class="flex items-center gap-3">
                                     <div class="w-10 h-10 rounded-full bg-primary-brown text-white flex items-center justify-center font-bold text-sm">${inisial}</div>
@@ -164,10 +167,10 @@
                                     <option value="Sakit" ${ketAbsen === 'Sakit' ? 'selected' : ''}>Sakit</option>
                                     <option value="Pulang / Izin" ${ketAbsen === 'Pulang / Izin' ? 'selected' : ''}>Pulang / Izin</option>
                                 </select>
-                                <button onclick="bukaModalEditSantri('${docId}', '${data.nama}', '${data.kelas}', '${data.nisn || ''}', '${data.asrama}')" class="bg-amber-100 text-amber-800 hover:bg-amber-200 font-bold px-2.5 py-1.5 rounded-lg transition-colors text-[10px]">
+                                <button onclick="bukaModalEditSantri('${docId}', '${data.nama.replace(/'/g, "\\'")}', '${data.kelas.replace(/'/g, "\\'")}', '${data.nisn || ''}', '${data.asrama.replace(/'/g, "\\'")}')" class="bg-amber-100 text-amber-800 hover:bg-amber-200 font-bold px-2.5 py-1.5 rounded-lg transition-colors text-[10px]">
                                     <i class="fa-solid fa-pen-to-square"></i> Edit
                                 </button>
-                                <button onclick="hapusSantriCloud('${docId}', '${data.nama}')" class="bg-rose-100 text-rose-700 hover:bg-rose-200 font-bold px-2.5 py-1.5 rounded-lg transition-colors text-[10px]">
+                                <button onclick="hapusSantriCloud('${docId}', '${data.nama.replace(/'/g, "\\'")}')" class="bg-rose-100 text-rose-700 hover:bg-rose-200 font-bold px-2.5 py-1.5 rounded-lg transition-colors text-[10px]">
                                     <i class="fa-solid fa-user-minus"></i> Hapus
                                 </button>
                             </div>
@@ -181,6 +184,7 @@
                 if (persentaseKehadiranEl) persentaseKehadiranEl.innerText = jumlahSantri > 0 ? "98.5%" : "0%";
 
                 window.globalStatistikKelas = statistikKelas;
+                window.muatDataKeuanganUntukUpdate();
             } catch (e) {
                 console.error("Gagal memuat santri: ", e);
             }
@@ -188,6 +192,12 @@
 
         window.simpanCatatanMusrifCloud = async function(dataObjek) {
             try {
+                // Validasi Integritas: Cek apakah nama santri masih ada di data aktif
+                const daftarNamaAktif = window.cacheDataSantri.map(s => s.nama.toLowerCase());
+                if (!daftarNamaAktif.includes(dataObjek.namaSantri.toLowerCase())) {
+                    return { status: "error", pesan: `GAGAL: Nama '${dataObjek.namaSantri}' tidak terdaftar sebagai santri aktif!` };
+                }
+
                 const todayDateStr = new Date().toLocaleDateString('id-ID');
                 const qCek = query(
                     collection(db, "catatan_musrif"), 
@@ -198,7 +208,7 @@
                 const snapCek = await getDocs(qCek);
                 
                 if (!snapCek.empty) {
-                    return { status: "sudah_absen", pesan: `Santri ${dataObjek.namaSantri} sudah berhasil absen sebelumnya untuk kegiatan ini!` };
+                    return { status: "sudah_absen", pesan: `ANDA SUDAH ABSEN<br><span class="text-xs font-normal">${dataObjek.namaSantri} sudah tercatat sebelumnya.</span>` };
                 }
 
                 await addDoc(collection(db, "catatan_musrif"), {
@@ -207,7 +217,7 @@
                     waktuUpdate: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
                     timestamp: Date.now()
                 });
-                return { status: "sukses", pesan: `Berhasil! Absen ${dataObjek.kegiatan} untuk ${dataObjek.namaSantri} tercatat.` };
+                return { status: "sukses", pesan: `ANDA BERHASIL ABSEN<br><span class="text-xs font-normal">${dataObjek.namaSantri} - ${dataObjek.kegiatan}</span>` };
             } catch (e) {
                 console.error("Gagal menyimpan ke database: ", e);
                 return { status: "error", pesan: "Gagal menyimpan data ke Cloud." };
@@ -216,6 +226,12 @@
 
         window.simpanKeuanganBendaharaDetail = async function(namaSantri, jenisPos, bulanTagih, tahunTagih, nominal, statusBayar) {
             try {
+                const daftarNamaAktif = window.cacheDataSantri.map(s => s.nama.toLowerCase());
+                if (!daftarNamaAktif.includes(namaSantri.toLowerCase())) {
+                    alert("Gagal! Nama santri '" + namaSantri + "' tidak ditemukan dalam daftar santri aktif. Pastikan nama sesuai.");
+                    return;
+                }
+
                 await addDoc(collection(db, "catatan_keuangan_detail"), {
                     namaSantri: namaSantri,
                     jenisPos: jenisPos,
@@ -235,6 +251,9 @@
 
         window.muatDataKeuanganUntukUpdate = async function() {
             const container = document.getElementById('list-update-keuangan-container');
+            const filterTahunEl = document.getElementById('filter-tahun-bendahara');
+            const tahunTerpilih = filterTahunEl ? filterTahunEl.value : "all";
+
             if (!container) return;
             container.innerHTML = `<p class="text-xs text-gray-400 text-center py-2">Memuat data keuangan...</p>`;
 
@@ -242,11 +261,22 @@
                 const querySnapshot = await getDocs(collection(db, "catatan_keuangan_detail"));
                 let html = "";
                 window.cacheDataKeuangan = [];
+                const daftarNamaAktif = window.cacheDataSantri.map(s => s.nama.toLowerCase());
 
                 querySnapshot.forEach((docSnap) => {
                     const data = docSnap.data();
                     const docId = docSnap.id;
+
+                    // VALIDASI INTEGRITAS: Hanya tampilkan jika nama santri MASIH ADA di daftar santri aktif
+                    if (!daftarNamaAktif.includes(data.namaSantri.toLowerCase())) {
+                        return; // Lewati / abaikan jika santri sudah dihapus
+                    }
+
                     window.cacheDataKeuangan.push({ id: docId, ...data });
+
+                    if (tahunTerpilih !== "all" && data.tahun !== tahunTerpilih) {
+                        return;
+                    }
 
                     const isLunas = data.status === "Lunas";
                     const badgeColor = isLunas ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800";
@@ -259,7 +289,7 @@
                             </div>
                             <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                                 <span class="px-2.5 py-1 rounded-lg font-bold text-[10px] ${badgeColor}">${data.status}</span>
-                                <button onclick="bukaModalEditKeuangan('${docId}', '${data.namaSantri}', '${data.jenisPos}', '${data.nominal}', '${data.status}')" class="bg-amber-100 text-amber-800 hover:bg-amber-200 font-bold px-3 py-1.5 rounded-lg transition-colors">
+                                <button onclick="bukaModalEditKeuangan('${docId}', '${data.namaSantri.replace(/'/g, "\\'")}', '${data.jenisPos}', '${data.nominal}', '${data.status}')" class="bg-amber-100 text-amber-800 hover:bg-amber-200 font-bold px-3 py-1.5 rounded-lg transition-colors">
                                     <i class="fa-solid fa-pen-to-square mr-1"></i> Ubah Status
                                 </button>
                             </div>
@@ -267,7 +297,7 @@
                     `;
                 });
 
-                container.innerHTML = html || `<p class="text-xs text-gray-500 text-center py-2">Belum ada riwayat data keuangan.</p>`;
+                container.innerHTML = html || `<p class="text-xs text-gray-500 text-center py-2">Belum ada riwayat data keuangan untuk santri aktif pada periode ini.</p>`;
             } catch (e) {
                 console.error("Gagal memuat data keuangan: ", e);
             }
@@ -290,64 +320,106 @@
             }
         };
 
-        window.muatDataSantriDariCloud = async function(namaSantri) {
+        window.muatDataSantriDariCloud = async function(namaSantri, rentangWaktu = 'harian') {
             const containerTahfidz = document.getElementById('container-tahfidz-santri');
             const containerAmalanSunnah = document.getElementById('container-amalan-sunnah');
+            const containerSholatWajib = document.getElementById('container-sholat-wajib-santri');
             const containerAgenda = document.getElementById('container-agenda-santri');
             const containerKeuangan = document.getElementById('container-keuangan-santri');
             
+            if (!containerTahfidz) return;
+
             containerTahfidz.innerHTML = `<span class="text-xs text-gray-400">Memuat...</span>`;
             containerAmalanSunnah.innerHTML = `<span class="text-xs text-gray-400">Memuat...</span>`;
+            if (containerSholatWajib) containerSholatWajib.innerHTML = `<span class="text-xs text-gray-400">Memuat...</span>`;
             containerAgenda.innerHTML = `<span class="text-xs text-gray-400">Memuat...</span>`;
             containerKeuangan.innerHTML = `<span class="text-xs text-gray-400">Memuat...</span>`;
 
             try {
-                const qMusrif = query(collection(db, "catatan_musrif"), where("namaSantri", "==", namaSantri));
-                const snapshotMusrif = await getDocs(qMusrif);
-                
-                let htmlTahfidz = "";
-                let htmlSunnah = "";
-                let htmlAgenda = "";
-
-                if (!snapshotMusrif.empty) {
+                if (!window.cacheRawMusrif || window.currentSelectedSantriName !== namaSantri) {
+                    const qMusrif = query(collection(db, "catatan_musrif"), where("namaSantri", "==", namaSantri));
+                    const snapshotMusrif = await getDocs(qMusrif);
+                    window.cacheRawMusrif = [];
                     snapshotMusrif.forEach((doc) => {
-                        const data = doc.data();
-                        if (data.kategori === "tahfidz") {
-                            htmlTahfidz += `
-                                <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
-                                    <div>
-                                        <span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded uppercase tracking-wider">${data.jenisSetoran || 'Setoran'}</span>
-                                        <span class="font-bold text-xs text-primary-brown block mt-1"><i class="fa-solid fa-book-quran text-amber-700 mr-1"></i> ${data.surat}</span>
-                                        <span class="text-[11px] text-gray-600 block">Ayat: ${data.ayat}</span>
-                                        <span class="text-[9px] text-gray-400">${data.waktuUpdate}</span>
-                                    </div>
-                                    <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded">${data.status}</span>
-                                </div>
-                            `;
-                        } else if (data.kategori === "sunnah") {
-                            htmlSunnah += `
-                                <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
-                                    <span class="text-xs font-medium text-gray-700"><i class="fa-solid fa-star text-amber-500 mr-1.5"></i> ${data.amalan}</span>
-                                    <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-lg">${data.keterangan || 'Dikerjakan'}</span>
-                                </div>
-                            `;
-                        } else if (data.kategori === "agenda") {
-                            htmlAgenda += `
-                                <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
-                                    <div>
-                                        <span class="font-bold text-xs text-primary-brown block"><i class="fa-solid fa-bookmark text-amber-600 mr-1"></i> ${data.kegiatan}</span>
-                                        <span class="text-[11px] text-gray-600">${data.catatan || '-'}</span>
-                                    </div>
-                                    <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-2.5 py-0.5 rounded">Tercatat</span>
-                                </div>
-                            `;
-                        }
+                        window.cacheRawMusrif.push(doc.data());
                     });
+                    window.currentSelectedSantriName = namaSantri;
                 }
 
-                containerTahfidz.innerHTML = htmlTahfidz || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Belum ada setoran tahfidz -</div>`;
-                containerAmalanSunnah.innerHTML = htmlSunnah || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Belum ada catatan amalan sunnah -</div>`;
-                containerAgenda.innerHTML = htmlAgenda || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Belum ada agenda / amalan khusus -</div>`;
+                const nowTime = Date.now();
+                const satuhariMs = 24 * 60 * 60 * 1000;
+                let batasMs = satuhariMs;
+
+                if (rentangWaktu === 'mingguan') {
+                    batasMs = 7 * satuhariMs;
+                } else if (rentangWaktu === 'bulanan') {
+                    batasMs = 35 * satuhariMs;
+                }
+
+                let htmlTahfidz = "";
+                let htmlSunnah = "";
+                let htmlSholatWajib = "";
+                let htmlAgenda = "";
+
+                window.cacheRawMusrif.forEach((data) => {
+                    const itemTimestamp = data.timestamp || 0;
+                    const selisihWaktu = nowTime - itemTimestamp;
+
+                    if (rentangWaktu === 'harian') {
+                        const itemDateStr = new Date(itemTimestamp).toLocaleDateString('id-ID');
+                        const todayDateStr = new Date().toLocaleDateString('id-ID');
+                        if (itemDateStr !== todayDateStr) return;
+                    } else {
+                        if (selisihWaktu > batasMs) return;
+                    }
+
+                    if (data.kategori === "tahfidz") {
+                        htmlTahfidz += `
+                            <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
+                                <div>
+                                    <span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded uppercase tracking-wider">${data.jenisSetoran || 'Setoran'}</span>
+                                    <span class="font-bold text-xs text-primary-brown block mt-1"><i class="fa-solid fa-book-quran text-amber-700 mr-1"></i> ${data.surat}</span>
+                                    <span class="text-[11px] text-gray-600 block">Ayat: ${data.ayat}</span>
+                                    <span class="text-[9px] text-gray-400">${data.waktuUpdate}</span>
+                                </div>
+                                <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded">${data.status}</span>
+                            </div>
+                        `;
+                    } else if (data.kategori === "sunnah") {
+                        htmlSunnah += `
+                            <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
+                                <span class="text-xs font-medium text-gray-700"><i class="fa-solid fa-star text-amber-500 mr-1.5"></i> ${data.amalan}</span>
+                                <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-lg">${data.keterangan || 'Dikerjakan'}</span>
+                            </div>
+                        `;
+                    } else if (data.kategori === "sholat") {
+                        htmlSholatWajib += `
+                            <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex justify-between items-center">
+                                <div>
+                                    <span class="font-bold text-xs text-emerald-900 block"><i class="fa-solid fa-mosque text-emerald-700 mr-1.5"></i> ${data.kegiatan}</span>
+                                    <span class="text-[9px] text-gray-500">${data.waktuUpdate || ''}</span>
+                                </div>
+                                <span class="text-[10px] bg-emerald-200 text-emerald-900 font-bold px-2.5 py-1 rounded-lg">Berjamaah (Hadir)</span>
+                            </div>
+                        `;
+                    } else if (data.kategori === "agenda") {
+                        htmlAgenda += `
+                            <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
+                                <div>
+                                    <span class="font-bold text-xs text-primary-brown block"><i class="fa-solid fa-bookmark text-amber-600 mr-1"></i> ${data.kegiatan}</span>
+                                    <span class="text-[11px] text-gray-600">${data.catatan || '-'}</span>
+                                    <span class="text-[9px] text-gray-400 block">${data.waktuUpdate || ''}</span>
+                                </div>
+                                <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-2.5 py-0.5 rounded">Tercatat</span>
+                            </div>
+                        `;
+                    }
+                });
+
+                containerTahfidz.innerHTML = htmlTahfidz || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada setoran tahfidz pada periode ini -</div>`;
+                containerAmalanSunnah.innerHTML = htmlSunnah || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada catatan amalan sunnah pada periode ini -</div>`;
+                if (containerSholatWajib) containerSholatWajib.innerHTML = htmlSholatWajib || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada riwayat sholat wajib pada periode ini -</div>`;
+                containerAgenda.innerHTML = htmlAgenda || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada agenda khusus pada periode ini -</div>`;
 
                 const qKeuangan = query(collection(db, "catatan_keuangan_detail"), where("namaSantri", "==", namaSantri));
                 const snapshotKeuangan = await getDocs(qKeuangan);
@@ -385,7 +457,6 @@
 
         window.addEventListener('DOMContentLoaded', () => {
             window.muatDaftarSantriDariCloud();
-            window.muatDataKeuanganUntukUpdate();
 
             const options = { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Jakarta' };
             const todayStr = new Date().toLocaleDateString('id-ID', options);
@@ -527,20 +598,32 @@
                     <span class="text-xs text-gray-500"><i class="fa-solid fa-clock-rotate-left mr-1"></i> Terakhir Diperbarui: <span id="current-timestamp">Hari ini</span></span>
                 </div>
 
-                <div class="bg-soft-cream p-4 rounded-xl border border-[#E3D5C9] flex justify-between items-center">
+                <div class="bg-soft-cream p-4 rounded-xl border border-[#E3D5C9] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
                         <span id="det-nisn" class="text-[10px] uppercase font-bold tracking-wider text-amber-800 bg-amber-100 px-2 py-0.5 rounded">NISN: -</span>
                         <h2 id="det-nama" class="text-lg font-bold text-primary-brown mt-1">Nama Santri</h2>
                         <p id="det-info" class="text-xs text-gray-600">Kelas & Asrama</p>
                     </div>
-                    <span id="det-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                        Hadir
-                    </span>
+                    <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                        <span id="det-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                            Hadir
+                        </span>
+                    </div>
+                </div>
+
+                <!-- PILIHAN FILTER WAKTU UNTUK ORANG TUA / WALI -->
+                <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-2 text-xs">
+                    <span class="font-bold text-amber-950"><i class="fa-solid fa-filter mr-1"></i> Filter Riwayat Absensi:</span>
+                    <div class="flex bg-white p-1 rounded-lg border border-amber-300 w-full sm:w-auto justify-center">
+                        <button onclick="gantiFilterWaktuSantri('harian')" id="btn-filter-harian" class="px-3 py-1 rounded-md font-bold bg-primary-brown text-white text-[11px] transition-all flex-1 sm:flex-initial">Harian</button>
+                        <button onclick="gantiFilterWaktuSantri('mingguan')" id="btn-filter-mingguan" class="px-3 py-1 rounded-md font-bold text-gray-700 text-[11px] transition-all flex-1 sm:flex-initial">Mingguan (7 Hari)</button>
+                        <button onclick="gantiFilterWaktuSantri('bulanan')" id="btn-filter-bulanan" class="px-3 py-1 rounded-md font-bold text-gray-700 text-[11px] transition-all flex-1 sm:flex-initial">Bulanan (35 Hari)</button>
+                    </div>
                 </div>
 
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center justify-between">
-                        <span><i class="fa-solid fa-wallet mr-1"></i> Riwayat Keuangan & Pos Kegiatan (Arsip 3 Tahun)</span>
+                        <span><i class="fa-solid fa-wallet mr-1"></i> Riwayat Keuangan & Pos Kegiatan</span>
                         <span class="text-[10px] font-normal text-gray-500">Live dari Cloud</span>
                     </h4>
                     <div id="container-keuangan-santri" class="space-y-2"></div>
@@ -548,9 +631,9 @@
 
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-kaaba"></i> Pemantauan Sholat 5 Waktu Berjamaah (Dinamis Bulan Berjalan)
+                        <i class="fa-solid fa-mosque"></i> Pemantauan Sholat Wajib Berjamaah
                     </h4>
-                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center" id="sholat-status-grid"></div>
+                    <div id="container-sholat-wajib-santri" class="space-y-2"></div>
                 </div>
 
                 <div class="space-y-3">
@@ -569,7 +652,7 @@
 
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-calendar-days"></i> Agenda, Kajian & Muhadhoroh Santri
+                        <i class="fa-solid fa-calendar-days"></i> Agenda & Kajian Khusus
                     </h4>
                     <div id="container-agenda-santri" class="space-y-2"></div>
                 </div>
@@ -608,8 +691,9 @@
                         </button>
                     </div>
 
-                    <div id="fast-scan-alert" class="p-4 rounded-xl border hidden text-center transition-all animate-bounce">
-                        <p id="fast-scan-msg" class="font-bold text-sm"></p>
+                    <!-- Kotak Notifikasi Hasil Scan Cepat -->
+                    <div id="fast-scan-alert" class="p-5 rounded-2xl border hidden text-center transition-all shadow-md">
+                        <p id="fast-scan-msg" class="font-bold text-base"></p>
                     </div>
 
                     <div class="py-2">
@@ -627,7 +711,7 @@
                 <!-- TIPE 2: SCAN BIASA / INTERAKTIF -->
                 <div id="container-scan-biasa" class="space-y-4 hidden text-center">
                     <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-left text-xs text-blue-900">
-                        <i class="fa-solid fa-circle-info mr-1"></i> <b>Scan Biasa (Interaktif):</b> Pilih kegiatan khusus (Sholat Dhuha, Puasa, Muhadhoroh, atau Tahfidz) setelah scan kartu santri.
+                        <i class="fa-solid fa-circle-info mr-1"></i> <b>Scan Biasa (Interaktif):</b> Pilih kegiatan santai (Sholat Dhuha, Puasa, Muhadhoroh, atau Tahfidz) setelah scan kartu santri.
                     </div>
 
                     <div class="py-2">
@@ -860,7 +944,7 @@
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <div>
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                            <i class="fa-solid fa-wallet"></i> Panel Bendahara: Rincian Keuangan & Update Status
+                            <i class="fa-solid fa-wallet"></i> Panel Bendahara: Rincian Keuangan (Arsip 3 Tahun)
                         </h3>
                         <p class="text-xs text-gray-600 mt-0.5">Input tagihan baru atau perbarui status pembayaran telat sewaktu-waktu.</p>
                     </div>
@@ -872,7 +956,7 @@
                 <div class="space-y-3 bg-soft-cream p-4 rounded-xl border border-[#E3D5C9]">
                     <h4 class="font-bold text-xs text-primary-brown"><i class="fa-solid fa-plus-circle mr-1"></i> Input Pembayaran / Tagihan Baru</h4>
                     <div>
-                        <label class="block text-xs font-bold text-primary-brown mb-1">Nama Santri</label>
+                        <label class="block text-xs font-bold text-primary-brown mb-1">Nama Santri (Harus Santri Aktif)</label>
                         <input type="text" id="bendahara-nama" placeholder="Contoh: Ahmad Fauzan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown">
                     </div>
 
@@ -911,6 +995,7 @@
                         <div>
                             <label class="block text-xs font-bold text-primary-brown mb-1">Tahun</label>
                             <select id="bendahara-tahun" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown">
+                                <option value="2024">2024</option>
                                 <option value="2025">2025</option>
                                 <option value="2026" selected>2026</option>
                                 <option value="2027">2027</option>
@@ -935,11 +1020,18 @@
                 </div>
 
                 <div class="space-y-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
-                    <div class="flex justify-between items-center">
-                        <h4 class="font-bold text-xs text-amber-900"><i class="fa-solid fa-pen-to-square mr-1"></i> Update & Ganti Data Pembayaran (Pelunasan Telat)</h4>
-                        <input type="text" id="search-update-keuangan" onkeyup="filterUpdateKeuangan()" placeholder="Cari nama santri..." class="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-white focus:outline-none w-48">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <h4 class="font-bold text-xs text-amber-900"><i class="fa-solid fa-pen-to-square mr-1"></i> Filter Arsip Keuangan (Hanya Santri Aktif)</h4>
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <select id="filter-tahun-bendahara" onchange="muatDataKeuanganUntukUpdate()" class="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-white font-bold text-primary-brown">
+                                <option value="all">Semua Tahun (Arsip 3 Tahun)</option>
+                                <option value="2026" selected>Tahun 2026</option>
+                                <option value="2025">Tahun 2025</option>
+                                <option value="2024">Tahun 2024</option>
+                            </select>
+                            <input type="text" id="search-update-keuangan" onkeyup="filterUpdateKeuangan()" placeholder="Cari santri..." class="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-white focus:outline-none w-36">
+                        </div>
                     </div>
-                    <p class="text-[11px] text-amber-800">Cari santri yang melunasi pembayaran telat, lalu klik tombol ubah status di sampingnya.</p>
                     <div id="list-update-keuangan-container" class="space-y-2 max-h-60 overflow-y-auto"></div>
                 </div>
             </div>
@@ -1145,46 +1237,20 @@
             }
         }
 
-        function renderStatusSholatOtomatis() {
-            const now = new Date();
-            const bulan = now.getMonth(); 
-            const jam = now.getHours();
-            const menit = now.getMinutes();
-            const totalMenit = jam * 60 + menit;
-
-            let offsetMenit = (bulan >= 3 && bulan <= 8) ? 5 : -5;
-
-            const daftarSholat = [
-                { nama: "Subuh", start: 240 + offsetMenit, end: 360 + offsetMenit },
-                { nama: "Dzuhur", start: 690 + offsetMenit, end: 840 + offsetMenit },
-                { nama: "Ashar", start: 900 + offsetMenit, end: 1050 + offsetMenit },
-                { nama: "Maghrib", start: 1080 + offsetMenit, end: 1140 + offsetMenit },
-                { nama: "Isya", start: 1140 + offsetMenit, end: 1260 + offsetMenit }
-            ];
-
-            let html = "";
-            daftarSholat.forEach(s => {
-                let statusBadge = "";
-                if (totalMenit > s.end) {
-                    statusBadge = `<span class="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded-lg block"><i class="fa-solid fa-xmark mr-1"></i> Alfa / Terlewat</span>`;
-                } else if (totalMenit >= s.start && totalMenit <= s.end) {
-                    statusBadge = `<span class="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg block"><i class="fa-solid fa-clock mr-1"></i> Belum Absen</span>`;
-                } else {
-                    statusBadge = `<span class="text-xs font-bold text-gray-400 bg-gray-50 border border-gray-200 px-2 py-1 rounded-lg block">- (Belum Waktunya)</span>`;
-                }
-
-                html += `
-                    <div class="bg-soft-cream p-2.5 rounded-xl border border-[#E3D5C9]">
-                        <span class="block text-[10px] text-gray-600 font-medium mb-1">${s.nama}</span>
-                        ${statusBadge}
-                    </div>
-                `;
-            });
-
-            document.getElementById('sholat-status-grid').innerHTML = html;
-        }
+        let activeFilterRentang = 'harian';
+        let currentOpenSantriName = "";
+        let currentOpenSantriKelas = "";
+        let currentOpenSantriNisn = "";
+        let currentOpenSantriAsrama = "";
+        let currentOpenSantriKet = "";
 
         function openDetailSantri(nama, kelas, nisn, asrama, ketAbsen) {
+            currentOpenSantriName = nama;
+            currentOpenSantriKelas = kelas;
+            currentOpenSantriNisn = nisn;
+            currentOpenSantriAsrama = asrama;
+            currentOpenSantriKet = ketAbsen;
+
             document.getElementById('santri-list-view').classList.add('hidden');
             document.getElementById('santri-detail-view').classList.remove('hidden');
             document.getElementById('det-nama').innerText = nama;
@@ -1204,13 +1270,37 @@
             const now = new Date();
             document.getElementById('current-timestamp').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' }) + ", " + now.toLocaleTimeString('id-ID') + " WIB";
 
-            renderStatusSholatOtomatis();
-            if (window.muatDataSantriDariCloud) window.muatDataSantriDariCloud(nama);
+            gantiFilterWaktuSantri('harian');
+        }
+
+        function gantiFilterWaktuSantri(rentang) {
+            activeFilterRentang = rentang;
+            
+            const btnHarian = document.getElementById('btn-filter-harian');
+            const btnMingguan = document.getElementById('btn-filter-mingguan');
+            const btnBulanan = document.getElementById('btn-filter-bulanan');
+
+            btnHarian.className = "px-3 py-1 rounded-md font-bold text-gray-700 text-[11px] transition-all flex-1 sm:flex-initial";
+            btnMingguan.className = "px-3 py-1 rounded-md font-bold text-gray-700 text-[11px] transition-all flex-1 sm:flex-initial";
+            btnBulanan.className = "px-3 py-1 rounded-md font-bold text-gray-700 text-[11px] transition-all flex-1 sm:flex-initial";
+
+            if (rentang === 'harian') {
+                btnHarian.className = "px-3 py-1 rounded-md font-bold bg-primary-brown text-white text-[11px] transition-all flex-1 sm:flex-initial";
+            } else if (rentang === 'mingguan') {
+                btnMingguan.className = "px-3 py-1 rounded-md font-bold bg-primary-brown text-white text-[11px] transition-all flex-1 sm:flex-initial";
+            } else if (rentang === 'bulanan') {
+                btnBulanan.className = "px-3 py-1 rounded-md font-bold bg-primary-brown text-white text-[11px] transition-all flex-1 sm:flex-initial";
+            }
+
+            if (window.muatDataSantriDariCloud && currentOpenSantriName) {
+                window.muatDataSantriDariCloud(currentOpenSantriName, rentang);
+            }
         }
 
         function closeDetailSantri() {
             document.getElementById('santri-detail-view').classList.add('hidden');
             document.getElementById('santri-list-view').classList.remove('hidden');
+            currentOpenSantriName = "";
         }
 
         function bukaModalTotalSantri() {
@@ -1454,7 +1544,6 @@
             });
         }
 
-        // Fitur Unduh QR Code sebagai File Gambar PNG
         function unduhQrCodeSantri() {
             const qrCanvas = document.querySelector('#qrcode canvas');
             const qrImage = document.querySelector('#qrcode img');
@@ -1645,8 +1734,10 @@
 
                     const sesiAktif = localStorage.getItem('sesi_aktif_pesantren') || "Absen Sholat Subuh Berjamaah";
                     
-                    let kategoriTipe = sesiAktif.includes("Sholat") ? "sholat" : "agenda";
-                    if (sesiAktif.includes("Dhuha") || sesiAktif.includes("Qobliyah") || sesiAktif.includes("Ba'diyah")) {
+                    let kategoriTipe = "agenda";
+                    if (sesiAktif.includes("Sholat") && !sesiAktif.includes("Dhuha")) {
+                        kategoriTipe = "sholat";
+                    } else if (sesiAktif.includes("Dhuha") || sesiAktif.includes("Qobliyah") || sesiAktif.includes("Ba'diyah")) {
                         kategoriTipe = "sunnah";
                     }
 
@@ -1665,17 +1756,17 @@
                         
                         alertBox.classList.remove('hidden');
                         if (res.status === "sukses") {
-                            alertBox.className = "p-4 rounded-xl border bg-emerald-100 border-emerald-300 text-emerald-900 text-center transition-all";
-                            alertMsg.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-700 text-lg mr-1"></i> <b>BERHASIL ABSEN!</b><br>${decodedText} • ${sesiAktif}`;
+                            alertBox.className = "p-5 rounded-2xl border bg-emerald-100 border-emerald-400 text-emerald-900 text-center transition-all shadow-md";
+                            alertMsg.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-700 text-2xl mr-2"></i><span class="text-lg">ANDA BERHASIL ABSEN</span><br><span class="text-xs font-normal">${decodedText} • ${sesiAktif}</span>`;
                         } else {
-                            alertBox.className = "p-4 rounded-xl border bg-rose-100 border-rose-300 text-rose-900 text-center transition-all";
-                            alertMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-700 text-lg mr-1"></i> <b>SUDAH ABSEN!</b><br>${decodedText} sudah berhasil absen sebelumnya.`;
+                            alertBox.className = "p-5 rounded-2xl border bg-rose-100 border-rose-400 text-rose-900 text-center transition-all shadow-md";
+                            alertMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-700 text-2xl mr-2"></i><span class="text-lg">${res.status === "error" ? "GAGAL" : "ANDA SUDAH ABSEN"}</span><br><span class="text-xs font-normal">${res.pesan}</span>`;
                         }
 
                         setTimeout(() => {
                             alertBox.classList.add('hidden');
                             isProcessingScan = false;
-                        }, 2100);
+                        }, 2300);
                     }
                 },
                 (errorMessage) => {}
