@@ -95,8 +95,9 @@
                                 <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
                                     <div>
                                         <span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded uppercase tracking-wider">${data.jenisSetoran || 'Setoran'}</span>
-                                        <span class="font-bold text-xs text-primary-brown block mt-1">${data.surat} (${data.ayat})</span>
-                                        <span class="text-[10px] text-gray-500">${data.waktuUpdate}</span>
+                                        <span class="font-bold text-xs text-primary-brown block mt-1"><i class="fa-solid fa-book-quran text-amber-700 mr-1"></i> ${data.surat}</span>
+                                        <span class="text-[11px] text-gray-600 block">Ayat: ${data.ayat}</span>
+                                        <span class="text-[9px] text-gray-400">${data.waktuUpdate}</span>
                                     </div>
                                     <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded">${data.status}</span>
                                 </div>
@@ -390,7 +391,7 @@
 
                 <div id="reader" class="w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-cream hidden"></div>
 
-                <!-- KOTAK POP-UP INTERAKTIF PASCA-SCAN QR (DENGAN FORM SPESIFIK) -->
+                <!-- KOTAK POP-UP INTERAKTIF PASCA-SCAN QR -->
                 <div id="interactive-scan-box" class="hidden p-5 bg-amber-50 border border-amber-200 rounded-2xl text-left space-y-4">
                     <div class="flex items-center justify-between border-b border-amber-200 pb-2">
                         <span class="text-xs font-bold text-amber-900"><i class="fa-solid fa-user-check mr-1"></i> Santri Terdeteksi:</span>
@@ -413,12 +414,12 @@
                         <p class="text-[11px] text-gray-600 bg-white p-2.5 rounded-lg border border-cream">Sistem akan otomatis mendeteksi sholat wajib (Subuh/Dzuhur/Ashar/Maghrib/Isya) berdasarkan jam saat ini.</p>
                     </div>
 
-                    <!-- 2. Form Tahfidz (Lengkap dengan Ziyadah/Murojaah/Imtihan & Surat/Ayat) -->
+                    <!-- 2. Form Tahfidz (Dinamis: Ziyadah 1 Surat, Murojaah/Imtihan Dari Surat s/d Surat) -->
                     <div id="subform-tahfidz" class="space-y-3 hidden">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div>
                                 <label class="block text-[11px] font-bold text-primary-brown mb-1">Jenis Setoran</label>
-                                <select id="scan-tahfidz-jenis" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                <select id="scan-tahfidz-jenis" onchange="gantiJenisTahfidz()" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                                     <option value="Ziyadah (Hafalan Baru)">Ziyadah (Hafalan Baru)</option>
                                     <option value="Murojaah (Pengulangan)">Murojaah (Pengulangan)</option>
                                     <option value="Imtihan (Ujian / Tasmi')">Imtihan (Ujian / Tasmi')</option>
@@ -433,7 +434,9 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+
+                        <!-- Sub-field Ziyadah (1 Surat) -->
+                        <div id="tahfidz-ziyadah-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div>
                                 <label class="block text-[11px] font-bold text-primary-brown mb-1">Nama Surat / Juz</label>
                                 <input type="text" id="scan-tahfidz-surat" placeholder="Contoh: An-Naba / Juz 30" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
@@ -441,6 +444,24 @@
                             <div>
                                 <label class="block text-[11px] font-bold text-primary-brown mb-1">Rentang Ayat</label>
                                 <input type="text" id="scan-tahfidz-ayat" placeholder="Contoh: Ayat 1-15" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                            </div>
+                        </div>
+
+                        <!-- Sub-field Murojaah & Imtihan (Dari Surat s/d Surat) -->
+                        <div id="tahfidz-murojaah-fields" class="space-y-2 hidden">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Dari Surat / Juz Awal</label>
+                                    <input type="text" id="scan-murojaah-dari" placeholder="Contoh: An-Nazi'at" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Sampai Surat / Juz Akhir</label>
+                                    <input type="text" id="scan-murojaah-sampai" placeholder="Contoh: An-Naba" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-primary-brown mb-1">Rentang Ayat / Keterangan</label>
+                                <input type="text" id="scan-murojaah-ayat" placeholder="Contoh: Selesai / Ayat 1-40" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                             </div>
                         </div>
                     </div>
@@ -799,6 +820,21 @@
             document.getElementById('subform-' + kat).classList.remove('hidden');
         }
 
+        // Kontrol Ganti Jenis Tahfidz (Ziyadah vs Murojaah/Imtihan)
+        function gantiJenisTahfidz() {
+            const jenis = document.getElementById('scan-tahfidz-jenis').value;
+            const fieldZiyadah = document.getElementById('tahfidz-ziyadah-fields');
+            const fieldMurojaah = document.getElementById('tahfidz-murojaah-fields');
+
+            if (jenis.includes('Ziyadah')) {
+                fieldZiyadah.classList.remove('hidden');
+                fieldMurojaah.classList.add('hidden');
+            } else {
+                fieldZiyadah.classList.add('hidden');
+                fieldMurojaah.classList.remove('hidden');
+            }
+        }
+
         let currentScannedSantri = "";
         let html5QrCode;
 
@@ -821,6 +857,7 @@
                     document.getElementById('scanned-santri-name').innerText = decodedText;
                     document.getElementById('interactive-scan-box').classList.remove('hidden');
                     gantiFormScan();
+                    gantiJenisTahfidz();
                 },
                 (errorMessage) => {}
             ).catch((err) => {
@@ -866,19 +903,31 @@
             else if (kat === 'tahfidz') {
                 const jenisSetoran = document.getElementById('scan-tahfidz-jenis').value;
                 const status = document.getElementById('scan-tahfidz-status').value;
-                const surat = document.getElementById('scan-tahfidz-surat').value.trim();
-                const ayat = document.getElementById('scan-tahfidz-ayat').value.trim();
-
-                if (!surat) {
-                    alert("Mohon isi Nama Surat / Juz terlebih dahulu!");
-                    return;
-                }
 
                 payload.kategori = "tahfidz";
                 payload.jenisSetoran = jenisSetoran;
                 payload.status = status;
-                payload.surat = surat;
-                payload.ayat = ayat || "-";
+
+                if (jenisSetoran.includes('Ziyadah')) {
+                    const surat = document.getElementById('scan-tahfidz-surat').value.trim();
+                    const ayat = document.getElementById('scan-tahfidz-ayat').value.trim();
+                    if (!surat) {
+                        alert("Mohon isi Nama Surat / Juz terlebih dahulu!");
+                        return;
+                    }
+                    payload.surat = surat;
+                    payload.ayat = ayat || "-";
+                } else {
+                    const dariSurat = document.getElementById('scan-murojaah-dari').value.trim();
+                    const sampaiSurat = document.getElementById('scan-murojaah-sampai').value.trim();
+                    const ayatMurojaah = document.getElementById('scan-murojaah-ayat').value.trim();
+                    if (!dariSurat || !sampaiSurat) {
+                        alert("Mohon isi rentang Surat Awal dan Surat Akhir terlebih dahulu!");
+                        return;
+                    }
+                    payload.surat = `Dari Surat ${dariSurat} s/d ${sampaiSurat}`;
+                    payload.ayat = ayatMurojaah || "Selesai";
+                }
             } 
             else if (kat === 'sunnah') {
                 const jenisAmalan = document.getElementById('scan-sunnah-jenis').value;
