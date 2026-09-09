@@ -611,7 +611,9 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-base md:text-lg leading-tight">Pondok Pesantren Utsman Bin Affan</h1>
-                    <p class="text-xs text-[#E3D5C9]">Sistem Informasi & SPMB Terpadu</p>
+                    <p class="text-xs text-[#E3D5C9]">
+                        <i class="fa-solid fa-location-dot mr-1"></i> Jln. Salak Gg. 1 No. 10 Lelateng, Kec. Negara, Jembrana, Bali
+                    </p>
                 </div>
             </div>
             <div class="hidden sm:flex items-center space-x-2 bg-[#7D5A50] px-3 py-1.5 rounded-full text-xs">
@@ -684,20 +686,20 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="p-4 bg-soft-cream rounded-xl border border-cream space-y-2">
-                        <span class="font-bold text-xs text-primary-brown block"><i class="fa-solid fa-calendar-check text-emerald-700 mr-1"></i> Gelombang Pendaftaran</span>
-                        <ul class="text-xs text-gray-700 space-y-1.5 pl-4 list-disc">
-                            <li><b>Gelombang 1:</b> 1 Januari – 31 Maret 2026 (Diskon Uang Gedung)</li>
-                            <li><b>Gelombang 2:</b> 1 April – 30 Juni 2026</li>
-                            <li><b>Gelombang 3:</b> 1 Juli – 31 Juli 2026 (Jika kuota masih ada)</li>
-                        </ul>
+                        <span class="font-bold text-xs text-primary-brown block"><i class="fa-solid fa-calendar-check text-emerald-700 mr-1"></i> Pendaftaran & Kuota</span>
+                        <p class="text-xs text-gray-700 leading-relaxed">
+                            <b>Gelombang Pendaftaran:</b> Dibuka mulai sekarang sampai kuota terpenuhi.<br>
+                            <b>Kuota Tersedia:</b> Maksimal <b>15 orang santri</b> untuk menjaga efektivitas pembelajaran.
+                        </p>
                     </div>
 
                     <div class="p-4 bg-soft-cream rounded-xl border border-cream space-y-2">
-                        <span class="font-bold text-xs text-primary-brown block"><i class="fa-solid fa-clipboard-list text-amber-700 mr-1"></i> Program Unggulan</span>
-                        <ul class="text-xs text-gray-700 space-y-1.5 pl-4 list-disc">
-                            <li>Program Tahfidz Al-Qur'an 30 Juz Bersanad</li>
-                            <li>Kajian Kitab Kuning & Bahasa Arab Aktif</li>
-                            <li>Kurikulum Nasional Terpadu & Ekstrakurikuler IT</li>
+                        <span class="font-bold text-xs text-primary-brown block"><i class="fa-solid fa-clipboard-list text-amber-700 mr-1"></i> Program & Target Utama</span>
+                        <ul class="text-xs text-gray-700 space-y-1 pl-4 list-disc">
+                            <li>Bahasa Arab Aktif (Baca, Tulis, Bicara)</li>
+                            <li>Tahfidz Al-Qur'an (Target 10 Juz dalam 3 Tahun) & Hadits</li>
+                            <li>Hafalan Matan Kitab & Pemahaman Isinya</li>
+                            <li>Kemandirian, Bersosialisasi & Berakhlak Mulia</li>
                         </ul>
                     </div>
                 </div>
@@ -718,13 +720,14 @@
                 <div class="border-b border-cream pb-3">
                     <span class="text-[10px] uppercase font-bold bg-primary-brown text-white px-2.5 py-0.5 rounded">Profil Pesantren</span>
                     <h3 class="font-bold text-lg text-primary-brown mt-1">
-                        <i class="fa-solid fa-mosque text-primary-brown mr-1.5"></i> Visi, Misi & Fasilitas Asrama
+                        <i class="fa-solid fa-mosque text-primary-brown mr-1.5"></i> Profil & Fasilitas Asrama
                     </h3>
                 </div>
 
-                <div class="space-y-3 text-xs text-gray-700 leading-relaxed">
-                    <p><b>Visi Utama:</b> Menjadi lembaga pendidikan Islam unggulan yang mencetak kader ulama dan pemimpin ummat berwawasan qur'ani serta berakhlakul karimah.</p>
-                    <p><b>Fasilitas Pesantren:</b></p>
+                <div class="space-y-4 text-xs text-gray-700 leading-relaxed">
+                    <p><b>Pondok Pesantren Utsman Bin Affan</b> berkomitmen mencetak generasi Islam yang berilmu, berakhlak mulia, dan berpedoman pada Al-Qur'an serta As-Sunnah.</p>
+                    
+                    <p><b>Fasilitas Pesantren & Tombol Visi Misi:</b></p>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
                         <div class="p-3 bg-soft-cream rounded-xl text-center border border-cream">
                             <i class="fa-solid fa-building-columns text-primary-brown text-lg mb-1"></i>
@@ -738,11 +741,52 @@
                             <i class="fa-solid fa-book-open text-primary-brown text-lg mb-1"></i>
                             <span class="block font-bold text-[11px]">Gedung Tahfidz</span>
                         </div>
-                        <div class="p-3 bg-soft-cream rounded-xl text-center border border-cream">
-                            <i class="fa-solid fa-laptop-code text-primary-brown text-lg mb-1"></i>
-                            <span class="block font-bold text-[11px]">Lab Komputer</span>
+                        <!-- Tombol Visi Misi Interaktif (Ikon Masjid) -->
+                        <div onclick="toggleVisiMisi()" class="p-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-center border border-emerald-800 cursor-pointer transition-all shadow-sm flex flex-col justify-center items-center">
+                            <i class="fa-solid fa-book-bookmark text-lg mb-1"></i>
+                            <span class="block font-bold text-[11px] leading-tight">Visi & Misi (Klik)</span>
                         </div>
                     </div>
+
+                    <!-- KONTEN VISI & MISI (TERSEMBUNYI HINGGA DIKLIK) -->
+                    <div id="box-visi-misi" class="space-y-4 pt-2 hidden transition-all">
+                        <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-2">
+                            <h4 class="font-bold text-emerald-950 text-sm flex items-center gap-1.5">
+                                <i class="fa-solid fa-bullseye text-emerald-700"></i> Visi Pesantren:
+                            </h4>
+                            <p class="text-emerald-900 font-medium">
+                                Unggul dengan integritas kepada agama dan berperilaku akhlaq yang mulia, berprestasi dengan ilmu pengetahuan dan bermanfaat bagi diri dan masyarakat.
+                            </p>
+                        </div>
+
+                        <div class="p-4 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
+                            <h4 class="font-bold text-amber-950 text-sm flex items-center gap-1.5">
+                                <i class="fa-solid fa-list-check text-amber-700"></i> Misi Pesantren:
+                            </h4>
+                            <ol class="space-y-1.5 pl-4 list-decimal text-amber-950">
+                                <li>Mendidik santri tentang agama Islam yang benar yang berdasar kepada Al-Qur'an dan As-Sunnah dengan pemahaman Salafus Shalih.</li>
+                                <li>Membentuk santri agar bisa menghafalkan dan mencintai Al-Qur'an.</li>
+                                <li>Mendidik santri agar cinta kepada Sunnah Rasulullah ﷺ, menghafalkannya, dan mengamalkannya.</li>
+                                <li>Membentuk santri pribadi yang mandiri, bermanfaat untuk orang lain, dan berakhlak mulia.</li>
+                                <li>Membekali santri dengan ilmu pengetahuan yang cukup untuk menghadapi kehidupan yang nyata.</li>
+                            </ol>
+                        </div>
+
+                        <!-- BAGIAN PROGRAM / TARGET SANTRI -->
+                        <div class="p-4 bg-blue-50 rounded-xl border border-blue-200 space-y-2">
+                            <h4 class="font-bold text-blue-950 text-sm flex items-center gap-1.5">
+                                <i class="fa-solid fa-bullseye text-blue-700"></i> Target & Program Pembelajaran Santri:
+                            </h4>
+                            <ol class="space-y-1.5 pl-4 list-decimal text-blue-950">
+                                <li>Santri mampu membaca, menulis, serta berbicara Bahasa Arab secara aktif.</li>
+                                <li>Santri mampu menghafal Al-Qur'an dengan target 10 Juz dalam 3 tahun serta menghafal hadits-hadits.</li>
+                                <li>Santri mampu menghafal matan-matan kitab dan memahami isinya.</li>
+                                <li>Santri bisa hidup mandiri dan bersosialisasi dengan masyarakat.</li>
+                                <li>Santri yang memiliki akhlaq mulia.</li>
+                            </ol>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
@@ -894,10 +938,10 @@
                     </div>
                     <div class="flex bg-soft-cream p-1 rounded-xl border border-cream text-xs">
                         <button onclick="pilihTipeScan('cepat')" id="btn-tipe-cepat" class="px-3 py-1.5 rounded-lg font-bold bg-primary-brown text-white shadow-sm transition-all">
-                            <i class="fa-solid fa-bolt mr-1"></i> Scan Cepat Beruntun
+                            <i class="fa-solid fa-bolt mr-1"></i> Scan Cepat Beruntun (Bebas Semua Sesi)
                         </button>
                         <button onclick="pilihTipeScan('biasa')" id="btn-tipe-biasa" class="px-3 py-1.5 rounded-lg font-bold text-gray-700 hover:text-primary-brown transition-all">
-                            <i class="fa-solid fa-hand-pointer mr-1"></i> Scan Biasa (Interaktif)
+                            <i class="fa-solid fa-hand-pointer mr-1"></i> Scan Biasa (Khusus Tahfidz & Setoran)
                         </button>
                     </div>
                 </div>
@@ -931,15 +975,15 @@
                     <div id="reader-cepat" class="w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-cream hidden"></div>
                 </div>
 
-                <!-- TIPE 2: SCAN BIASA / INTERAKTIF -->
+                <!-- TIPE 2: SCAN BIASA / INTERAKTIF (KHUSUS TAHFIDZ) -->
                 <div id="container-scan-biasa" class="space-y-4 hidden text-center">
                     <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-left text-xs text-blue-900">
-                        <i class="fa-solid fa-circle-info mr-1"></i> <b>Scan Biasa (Interaktif):</b> Pilih kegiatan (Tahfidz Pagi/Sore, Kajian Sore/Malam, Sholat Sunnah, dll) setelah scan kartu santri.
+                        <i class="fa-solid fa-circle-info mr-1"></i> <b>Scan Biasa (Khusus Tahfidz & Setoran):</b> Digunakan untuk menginput kehadiran, Ziyadah, atau Murojaah Tahfidz Pagi / Sore secara rinci.
                     </div>
 
                     <div class="py-2">
                         <button onclick="startNormalQrScanner()" class="bg-primary-brown text-white text-xs font-semibold px-5 py-3 rounded-xl hover:bg-[#4A3228] transition-colors shadow-sm inline-flex items-center gap-2">
-                            <i class="fa-solid fa-camera"></i> Mulai Kamera Scan Biasa
+                            <i class="fa-solid fa-camera"></i> Mulai Kamera Scan Tahfidz
                         </button>
                         <button onclick="stopNormalQrScanner()" class="bg-gray-200 text-gray-700 text-xs font-semibold px-5 py-3 rounded-xl hover:bg-gray-300 transition-colors shadow-sm ml-2">
                             Tutup Kamera
@@ -955,18 +999,14 @@
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Kategori Kegiatan / Sesi:</label>
-                            <select id="scan-kategori-pilih" onchange="gantiFormScan()" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown font-semibold text-primary-brown">
-                                <option value="tahfidz-pagi">1. Tahfidz Pagi (Absen / Setoran)</option>
-                                <option value="tahfidz-sore">2. Tahfidz Sore (Absen / Setoran)</option>
-                                <option value="sunnah">3. Amalan Sunnah & Puasa (Dhuha, Qobliyah, dll)</option>
-                                <option value="kajian-sore">4. Kajian Sore</option>
-                                <option value="kajian-malam">5. Kajian Malam</option>
-                                <option value="agenda">6. Kegiatan Khusus Lainnya (Muhadhoroh, Al-Kahfi, Dzikir)</option>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Sesi Tahfidz:</label>
+                            <select id="scan-kategori-pilih" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown font-semibold text-primary-brown">
+                                <option value="tahfidz-pagi">Tahfidz Pagi (Absen / Setoran)</option>
+                                <option value="tahfidz-sore">Tahfidz Sore (Absen / Setoran)</option>
                             </select>
                         </div>
 
-                        <!-- SUBFORM TAHFIDZ (PAGI / SORE) -->
+                        <!-- SUBFORM TAHFIDZ -->
                         <div id="subform-tahfidz-group" class="space-y-3">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <div>
@@ -1015,27 +1055,6 @@
                                     <input type="text" id="scan-murojaah-ayat" placeholder="Selesai / Ayat 1-40" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- SUBFORM SUNNAH -->
-                        <div id="subform-sunnah" class="space-y-2 hidden">
-                            <label class="block text-[11px] font-bold text-primary-brown mb-1">Pilih Amalan Sunnah / Puasa</label>
-                            <select id="scan-sunnah-jenis" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
-                                <option value="Sholat Dhuha">Sholat Dhuha</option>
-                                <option value="Sholat Qobliyah Dzuhur">Sholat Qobliyah Dzuhur</option>
-                                <option value="Sholat Ba'diyah Dzuhur">Sholat Ba'diyah Dzuhur</option>
-                                <option value="Puasa Senin-Kamis">Puasa Senin-Kamis</option>
-                                <option value="Puasa Daud">Puasa Daud</option>
-                                <option value="Qobliyah Subuh">Qobliyah Subuh</option>
-                                <option value="Ba'diyah Maghrib">Ba'diyah Maghrib</option>
-                                <option value="Ba'diyah Isya">Ba'diyah Isya</option>
-                            </select>
-                        </div>
-
-                        <!-- SUBFORM KAJIAN SORE / MALAM / AGENDA -->
-                        <div id="subform-agenda" class="space-y-2 hidden">
-                            <label class="block text-[11px] font-bold text-primary-brown mb-1">Keterangan / Judul Kajian / Catatan</label>
-                            <input type="text" id="scan-agenda-catatan" placeholder="Contoh: Kitab Riyadhus Shalihin / Selesai" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                         </div>
 
                         <div class="flex gap-2 pt-2">
@@ -1092,7 +1111,7 @@
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
                             <i class="fa-solid fa-bullhorn"></i> Panel Musrif: Sesi Scan Cepat, Koreksi Uzur & Hapus Catatan
                         </h3>
-                        <p class="text-xs text-gray-600 mt-0.5">Atur sesi scan cepat, ubah status kegiatan termasuk Tahfidz (Pagi/Sore) & Kajian (Sore/Malam) menjadi Udzur.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">Atur sesi scan cepat untuk semua kegiatan (Tahfidz, Sholat, Ba'diyah, Kajian, dll).</p>
                     </div>
                     <button onclick="lockPanel()" class="text-[10px] bg-rose-100 text-rose-800 font-bold px-2.5 py-1.5 rounded-lg hover:bg-rose-200">
                         <i class="fa-solid fa-lock mr-1"></i> Keluar
@@ -1102,7 +1121,7 @@
                 <div class="space-y-3 bg-soft-cream p-4 rounded-xl border border-[#E3D5C9]">
                     <h4 class="font-bold text-xs text-primary-brown"><i class="fa-solid fa-gear mr-1"></i> Seting Sesi Aktif untuk Menu 'Scan Cepat'</h4>
                     <div>
-                        <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Tahfidz, Sholat, Kajian Sore/Malam</label>
+                        <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Sesi Kegiatan</label>
                         <select id="setting-sesi-kegiatan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown font-bold text-primary-brown">
                             <optgroup label="Sesi Absensi Tahfidz">
                                 <option value="Tahfidz Pagi">Tahfidz Pagi</option>
@@ -1115,7 +1134,7 @@
                                 <option value="Absen Sholat Maghrib Berjamaah">Absen Sholat Maghrib Berjamaah</option>
                                 <option value="Absen Sholat Isya Berjamaah">Absen Sholat Isya Berjamaah</option>
                             </optgroup>
-                            <optgroup label="Sholat Sunnah & Kajian (Sore & Malam)">
+                            <optgroup label="Sholat Sunnah, Ba'diyah & Kajian">
                                 <option value="Sholat Dhuha">Sholat Dhuha</option>
                                 <option value="Sholat Qobliyah Dzuhur">Sholat Qobliyah Dzuhur</option>
                                 <option value="Sholat Ba'diyah Dzuhur">Sholat Ba'diyah Dzuhur</option>
@@ -1139,10 +1158,10 @@
                 <!-- FITUR KOREKSI UZDUR / IZIN PADA CATATAN KEGIATAN & TAHFIDZ -->
                 <div class="space-y-3 bg-purple-50 p-4 rounded-xl border border-purple-200">
                     <div class="flex justify-between items-center">
-                        <h4 class="font-bold text-xs text-purple-950"><i class="fa-solid fa-person-walking-arrow-right mr-1"></i> Koreksi Uzur Tahfidz / Kajian / Sholat & Hapus Catatan</h4>
+                        <h4 class="font-bold text-xs text-purple-950"><i class="fa-solid fa-person-walking-arrow-right mr-1"></i> Koreksi Uzur Kegiatan / Tahfidz & Hapus Catatan</h4>
                         <input type="text" id="search-hapus-kegiatan" onkeyup="filterHapusKegiatan()" placeholder="Cari santri/kegiatan..." class="text-xs px-3 py-1.5 rounded-lg border border-purple-300 bg-white focus:outline-none w-44">
                     </div>
-                    <p class="text-[11px] text-purple-900">Jika santri izin atau berhalangan hadir pada sesi tahfidz pagi/sore atau kajian sore/malam, klik tombol <b>Set Udzur</b> pada riwayat catatannya di bawah ini.</p>
+                    <p class="text-[11px] text-purple-900">Jika santri izin atau berhalangan hadir pada sesi kegiatan apa pun, klik tombol <b>Set Udzur</b> pada riwayat catatannya di bawah ini.</p>
                     <div id="list-hapus-kegiatan-container" class="space-y-2 max-h-56 overflow-y-auto"></div>
                 </div>
 
@@ -1399,6 +1418,17 @@
 
     <!-- JAVASCRIPT LOGIC -->
     <script>
+        // Fungsi interaktif untuk membuka/menutup Visi Misi
+        function toggleVisiMisi() {
+            const box = document.getElementById('box-visi-misi');
+            if (box.classList.contains('hidden')) {
+                box.classList.remove('hidden');
+                box.scrollIntoView({ behavior: 'smooth' });
+            } else {
+                box.classList.add('hidden');
+            }
+        }
+
         function switchTab(tabName) {
             const tabs = ['home', 'santri', 'scan', 'keterangan'];
             tabs.forEach(t => {
@@ -1842,22 +1872,6 @@
             }
         }
 
-        function gantiFormScan() {
-            const kat = document.getElementById('scan-kategori-pilih').value;
-            document.getElementById('subform-tahfidz-group').classList.add('hidden');
-            document.getElementById('subform-sunnah').classList.add('hidden');
-            document.getElementById('subform-agenda').classList.add('hidden');
-
-            if (kat === 'tahfidz-pagi' || kat === 'tahfidz-sore') {
-                document.getElementById('subform-tahfidz-group').classList.remove('hidden');
-                gantiJenisTahfidz();
-            } else if (kat === 'sunnah') {
-                document.getElementById('subform-sunnah').classList.remove('hidden');
-            } else if (kat === 'kajian-sore' || kat === 'kajian-malam' || kat === 'agenda') {
-                document.getElementById('subform-agenda').classList.remove('hidden');
-            }
-        }
-
         function gantiJenisTahfidz() {
             const jenis = document.getElementById('scan-tahfidz-jenis').value;
             const fieldZiyadah = document.getElementById('tahfidz-ziyadah-fields');
@@ -1901,7 +1915,7 @@
 
                     document.getElementById('scanned-santri-name').innerText = decodedText;
                     document.getElementById('interactive-scan-box').classList.remove('hidden');
-                    gantiFormScan();
+                    gantiJenisTahfidz();
                 },
                 (errorMessage) => {}
             ).catch((err) => {
@@ -1928,66 +1942,45 @@
 
         async function kirimAktivitasScanCloudNormal() {
             const kat = document.getElementById('scan-kategori-pilih').value;
-            let payload = { namaSantri: currentScannedSantriNormal };
+            const jenisSetoran = document.getElementById('scan-tahfidz-jenis').value;
+            const namaSesiTahfidz = kat === 'tahfidz-pagi' ? 'Tahfidz Pagi' : 'Tahfidz Sore';
+            
+            let payload = { 
+                namaSantri: currentScannedSantriNormal,
+                kategori: "tahfidz",
+                sesiTahfidz: namaSesiTahfidz,
+                kegiatan: namaSesiTahfidz,
+                jenisSetoran: jenisSetoran
+            };
 
-            if (kat === 'tahfidz-pagi' || kat === 'tahfidz-sore') {
-                const jenisSetoran = document.getElementById('scan-tahfidz-jenis').value;
-                const namaSesiTahfidz = kat === 'tahfidz-pagi' ? 'Tahfidz Pagi' : 'Tahfidz Sore';
-                
-                payload.kategori = "tahfidz";
-                payload.sesiTahfidz = namaSesiTahfidz;
-                payload.kegiatan = namaSesiTahfidz;
-                payload.jenisSetoran = jenisSetoran;
+            if (jenisSetoran.includes('Hadir')) {
+                payload.status = "Hadir";
+                payload.surat = "";
+                payload.ayat = "";
+            } else {
+                const status = document.getElementById('scan-tahfidz-status').value;
+                payload.status = status;
 
-                if (jenisSetoran.includes('Hadir')) {
-                    payload.status = "Hadir";
-                    payload.surat = "";
-                    payload.ayat = "";
-                } else {
-                    const status = document.getElementById('scan-tahfidz-status').value;
-                    payload.status = status;
-
-                    if (jenisSetoran.includes('Ziyadah')) {
-                        const surat = document.getElementById('scan-tahfidz-surat').value.trim();
-                        const ayat = document.getElementById('scan-tahfidz-ayat').value.trim();
-                        if (!surat) {
-                            alert("Mohon isi Nama Surat / Juz terlebih dahulu!");
-                            return;
-                        }
-                        payload.surat = surat;
-                        payload.ayat = ayat || "-";
-                    } else {
-                        const dariSurat = document.getElementById('scan-murojaah-dari').value.trim();
-                        const sampaiSurat = document.getElementById('scan-murojaah-sampai').value.trim();
-                        const ayatMurojaah = document.getElementById('scan-murojaah-ayat').value.trim();
-                        if (!dariSurat || !sampaiSurat) {
-                            alert("Mohon isi rentang Surat Awal dan Surat Akhir terlebih dahulu!");
-                            return;
-                        }
-                        payload.surat = `Dari Surat ${dariSurat} s/d ${sampaiSurat}`;
-                        payload.ayat = ayatMurojaah || "Selesai";
+                if (jenisSetoran.includes('Ziyadah')) {
+                    const surat = document.getElementById('scan-tahfidz-surat').value.trim();
+                    const ayat = document.getElementById('scan-tahfidz-ayat').value.trim();
+                    if (!surat) {
+                        alert("Mohon isi Nama Surat / Juz terlebih dahulu!");
+                        return;
                     }
+                    payload.surat = surat;
+                    payload.ayat = ayat || "-";
+                } else {
+                    const dariSurat = document.getElementById('scan-murojaah-dari').value.trim();
+                    const sampaiSurat = document.getElementById('scan-murojaah-sampai').value.trim();
+                    const ayatMurojaah = document.getElementById('scan-murojaah-ayat').value.trim();
+                    if (!dariSurat || !sampaiSurat) {
+                        alert("Mohon isi rentang Surat Awal dan Surat Akhir terlebih dahulu!");
+                        return;
+                    }
+                    payload.surat = `Dari Surat ${dariSurat} s/d ${sampaiSurat}`;
+                    payload.ayat = ayatMurojaah || "Selesai";
                 }
-            }
-            else if (kat === 'sunnah') {
-                const jenisAmalan = document.getElementById('scan-sunnah-jenis').value;
-                payload.kategori = "sunnah";
-                payload.amalan = jenisAmalan;
-                payload.kegiatan = jenisAmalan;
-                payload.keterangan = "Dikerjakan";
-            } 
-            else if (kat === 'kajian-sore' || kat === 'kajian-malam') {
-                const namaKajian = kat === 'kajian-sore' ? 'Kajian Sore' : 'Kajian Malam';
-                const catatanKajian = document.getElementById('scan-agenda-catatan').value.trim();
-                payload.kategori = "agenda";
-                payload.kegiatan = namaKajian;
-                payload.catatan = catatanKajian || "Hadir / Selesai";
-            }
-            else if (kat === 'agenda') {
-                const catatan = document.getElementById('scan-agenda-catatan').value.trim();
-                payload.kategori = "agenda";
-                payload.kegiatan = "Kegiatan Khusus";
-                payload.catatan = catatan || "Selesai / Aktif";
             }
 
             if (window.simpanCatatanMusrifCloud) {
@@ -2024,9 +2017,9 @@
                         kategoriTipe = "tahfidz";
                     } else if (sesiAktif.includes("Sholat") && !sesiAktif.includes("Dhuha") && !sesiAktif.includes("Qobliyah") && !sesiAktif.includes("Ba'diyah")) {
                         kategoriTipe = "sholat";
-                    } else if (sesiAktif.includes("Dhuha") || sesiAktif.includes("Qobliyah") || sesiAktif.includes("Ba'diyah")) {
+                    } else if (sesiAktif.includes("Dhuha") || sesiAktif.includes("Qobliyah") || sesiAktif.includes("Ba'diyah") || sesiAktif.includes("Sholat")) {
                         kategoriTipe = "sunnah";
-                    } else if (sesiAktif.includes("Kajian")) {
+                    } else {
                         kategoriTipe = "agenda";
                     }
 
