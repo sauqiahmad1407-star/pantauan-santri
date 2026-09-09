@@ -42,8 +42,8 @@
                 await addDoc(collection(db, "data_santri"), {
                     nama: nama,
                     kelas: kelas,
-                    nisn: nisn,
-                    asrama: asrama,
+                    nisn: nisn || "-",
+                    asrama: asrama || "Asrama Utama",
                     keteranganAbsen: "Aktif",
                     waktuDibuat: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
                     timestamp: Date.now()
@@ -220,14 +220,20 @@
                 
                 const qCek = query(
                     collection(db, "catatan_musrif"), 
-                    where("namaSantri", "==", dataObjek.namaSantri),
-                    where("kegiatan", "==", infoUnikCek),
-                    where("tanggalStr", "==", todayDateStr)
+                    where("namaSantri", "==", dataObjek.namaSantri)
                 );
                 const snapCek = await getDocs(qCek);
                 
-                if (!snapCek.empty) {
-                    return { status: "sudah_absen", pesan: `SUDAH TERCATAT<br><span class="text-xs font-normal">${dataObjek.namaSantri} sudah diabsen untuk kegiatan ini hari ini.</span>` };
+                let sudahAbsenHariIni = false;
+                snapCek.forEach((docSnap) => {
+                    const existingData = docSnap.data();
+                    if (existingData.tanggalStr === todayDateStr && existingData.kegiatan === infoUnikCek) {
+                        sudahAbsenHariIni = true;
+                    }
+                });
+                
+                if (sudahAbsenHariIni) {
+                    return { status: "sudah_absen", pesan: `ANDA TELAH ABSEN<br><span class="text-xs font-normal">${dataObjek.namaSantri} sudah diabsen untuk kegiatan "${infoUnikCek}" hari ini.</span>` };
                 }
 
                 await addDoc(collection(db, "catatan_musrif"), {
@@ -266,9 +272,12 @@
                                 <span class="font-bold text-primary-brown block">${badgeUdzur}${data.namaSantri}</span>
                                 <span class="text-[11px] text-gray-600">${infoKegiatan} • ${data.tanggalStr || '-'}</span>
                             </div>
-                            <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+                            <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end flex-wrap">
+                                <button onclick="bukaModalEditKegiatanMusrif('${docId}', '${data.namaSantri.replace(/'/g, "\\'")}','${infoKegiatan.replace(/'/g, "\\'")}')" class="bg-amber-100 text-amber-800 hover:bg-amber-200 font-bold px-2 py-1.5 rounded-lg transition-colors text-[10px]">
+                                    <i class="fa-solid fa-pen mr-1"></i> Edit Kegiatan
+                                </button>
                                 <button onclick="ubahUdzurCatatanMusrif('${docId}', '${isUdzur ? 'Aktif' : 'Udzur'}')" class="bg-purple-100 text-purple-800 hover:bg-purple-200 font-bold px-2.5 py-1.5 rounded-lg transition-colors text-[10px]">
-                                    <i class="fa-solid fa-person-walking-arrow-right mr-1"></i> ${isUdzur ? 'Batalkan Uzur' : 'Set Udzur'}
+                                    <i class="fa-solid fa-person-walking-arrow-right mr-1"></i> ${isUdzur ? 'Batal Uzur' : 'Set Udzur'}
                                 </button>
                                 <button onclick="hapusCatatanMusrifCloud('${docId}', '${data.namaSantri.replace(/'/g, "\\'")}')" class="bg-rose-100 text-rose-700 hover:bg-rose-200 font-bold px-2.5 py-1.5 rounded-lg transition-colors text-[10px]">
                                     <i class="fa-solid fa-trash mr-1"></i> Hapus
@@ -300,6 +309,26 @@
             } catch (e) {
                 console.error("Gagal memperbarui status uzur:", e);
                 alert("Gagal mengubah status.");
+            }
+        };
+
+        window.editKegiatanMusrifCloud = async function(docId, kegiatanBaru) {
+            try {
+                const docRef = doc(db, "catatan_musrif", docId);
+                await updateDoc(docRef, {
+                    kegiatan: kegiatanBaru,
+                    amalan: kegiatanBaru,
+                    waktuUpdate: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+                });
+                alert("Berhasil! Nama kegiatan berhasil diubah.");
+                tutupModalEditKegiatan();
+                window.muatDataHapusMusrif();
+                if (currentOpenSantriName) {
+                    window.muatDataSantriDariCloud(currentOpenSantriName, activeFilterRentang);
+                }
+            } catch (e) {
+                console.error("Gagal mengubah kegiatan:", e);
+                alert("Gagal memperbarui kegiatan.");
             }
         };
 
@@ -383,8 +412,11 @@
                             </div>
                             <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                                 <span class="px-2.5 py-1 rounded-lg font-bold text-[10px] ${badgeColor}">${data.status}</span>
-                                <button onclick="bukaModalEditKeuangan('${docId}', '${data.namaSantri.replace(/'/g, "\\'")}', '${data.jenisPos}', '${data.nominal}', '${data.status}')" class="bg-amber-100 text-amber-800 hover:bg-amber-200 font-bold px-3 py-1.5 rounded-lg transition-colors">
-                                    <i class="fa-solid fa-pen-to-square mr-1"></i> Ubah Status
+                                <button onclick="bukaModalEditKeuangan('${docId}', '${data.namaSantri.replace(/'/g, "\\'")}', '${data.jenisPos}', '${data.nominal}', '${data.status}')" class="bg-amber-100 text-amber-800 hover:bg-amber-200 font-bold px-2 py-1.5 rounded-lg transition-colors">
+                                    <i class="fa-solid fa-pen-to-square mr-1"></i> Ubah
+                                </button>
+                                <button onclick="hapusKeuanganCloud('${docId}')" class="bg-rose-100 text-rose-700 hover:bg-rose-200 font-bold px-2 py-1.5 rounded-lg transition-colors">
+                                    <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
                         </div>
@@ -411,6 +443,19 @@
             } catch (e) {
                 console.error("Gagal memperbarui data keuangan: ", e);
                 alert("Gagal memperbarui data.");
+            }
+        };
+
+        window.hapusKeuanganCloud = async function(docId) {
+            if (confirm("Apakah Anda yakin ingin menghapus data tagihan/pembayaran ini?")) {
+                try {
+                    await deleteDoc(doc(db, "catatan_keuangan_detail", docId));
+                    alert("Berhasil menghapus data keuangan.");
+                    window.muatDataKeuanganUntukUpdate();
+                } catch (e) {
+                    console.error("Gagal menghapus keuangan:", e);
+                    alert("Gagal menghapus data.");
+                }
             }
         };
 
@@ -466,7 +511,7 @@
 
                     if (data.kategori === "tahfidz") {
                         if ((data.jenisSetoran || "").includes("Ziyadah")) countZiyadah++;
-                        if ((data.jenisSetoran || "").includes("Murojaah")) countMurojaah++;
+                        if ((data.jenisSetoran || "").includes("Murojaah") || (data.jenisSetoran || "").includes("Imtihan")) countMurojaah++;
                     }
 
                     if (rentangWaktu === 'harian') {
@@ -491,7 +536,7 @@
                                 <div>
                                     <span class="text-[10px] bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded uppercase tracking-wider">${sesiJudul}</span>
                                     ${infoSetoran}
-                                    <span class="text-[9px] text-gray-400">${data.waktuUpdate}</span>
+                                    <span class="text-[9px] text-gray-400">${data.waktuUpdate || data.tanggalStr || ''}</span>
                                 </div>
                                 <span class="text-xs ${badgeKetClass} font-bold px-2.5 py-1 rounded">${statusKet}</span>
                             </div>
@@ -511,7 +556,7 @@
                             <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex justify-between items-center">
                                 <div>
                                     <span class="font-bold text-xs text-emerald-900 block"><i class="fa-solid fa-mosque text-emerald-700 mr-1.5"></i> ${data.kegiatan}</span>
-                                    <span class="text-[9px] text-gray-500">${data.waktuUpdate || ''}</span>
+                                    <span class="text-[9px] text-gray-500">${data.waktuUpdate || data.tanggalStr || ''}</span>
                                 </div>
                                 <span class="text-[10px] ${badgeKetClass} font-bold px-2.5 py-1 rounded-lg">${ketStatus}</span>
                             </div>
@@ -522,7 +567,7 @@
                                 <div>
                                     <span class="font-bold text-xs text-primary-brown block"><i class="fa-solid fa-bookmark text-amber-600 mr-1"></i> ${data.kegiatan}</span>
                                     <span class="text-[11px] text-gray-600">${data.catatan || '-'}</span>
-                                    <span class="text-[9px] text-gray-400 block">${data.waktuUpdate || ''}</span>
+                                    <span class="text-[9px] text-gray-400 block">${data.waktuUpdate || data.tanggalStr || ''}</span>
                                 </div>
                                 <span class="text-[10px] ${badgeKetClass} font-bold px-2.5 py-0.5 rounded">${ketStatus}</span>
                             </div>
@@ -531,7 +576,7 @@
                 });
 
                 if (statsZiyadahEl) statsZiyadahEl.innerText = countZiyadah + " Kali Setoran";
-                if (statsMurojaahEl) statsMurojaahEl.innerText = countMurojaah + " Kali Pengulangan";
+                if (statsMurojaahEl) statsMurojaahEl.innerText = countMurojaah + " Kali Pengulangan / Imtihan";
 
                 containerTahfidz.innerHTML = htmlTahfidz || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada absensi / setoran tahfidz pada periode ini -</div>`;
                 containerAmalanSunnah.innerHTML = htmlSunnah || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada catatan amalan sunnah pada periode ini -</div>`;
@@ -630,7 +675,7 @@
         <section id="menu-home" class="space-y-6">
             <div class="bg-gradient-to-r from-[#5C4033] to-[#8C6D62] text-white p-6 md:p-8 rounded-2xl shadow-sm relative overflow-hidden">
                 <div class="relative z-10 space-y-3">
-                    <span class="bg-[#E3D5C9] text-primary-brown text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">Pendaftaran Santri Baru (SPMB) 2026/2027</span>
+                    <span class="bg-[#E3D5C9] text-primary-brown text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">Sistem Informasi & SPMB Terpadu 2026/2027</span>
                     <h2 class="text-2xl md:text-3xl font-bold leading-tight">Membangun Generasi Qur'ani, Berakhlak & Berprestasi</h2>
                     <p class="text-xs md:text-sm text-[#F5EFEB] max-w-xl">Selamat datang di portal resmi Pondok Pesantren Utsman Bin Affan. Pusat pendidikan Islam terpadu yang memadukan ilmu syar'i dan teknologi modern.</p>
                     <div class="pt-2 flex flex-wrap gap-2">
@@ -743,7 +788,7 @@
                         </div>
                         <!-- Tombol Visi Misi Interaktif (Ikon Masjid) -->
                         <div onclick="toggleVisiMisi()" class="p-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-center border border-emerald-800 cursor-pointer transition-all shadow-sm flex flex-col justify-center items-center">
-                            <i class="fa-solid fa-book-bookmark text-lg mb-1"></i>
+                            <i class="fa-solid fa-mosque text-lg mb-1"></i>
                             <span class="block font-bold text-[11px] leading-tight">Visi & Misi (Klik)</span>
                         </div>
                     </div>
@@ -772,10 +817,10 @@
                             </ol>
                         </div>
 
-                        <!-- BAGIAN PROGRAM / TARGET SANTRI -->
+                        <!-- TARGET & PROGRAM PEMBELAJARAN SANTRI -->
                         <div class="p-4 bg-blue-50 rounded-xl border border-blue-200 space-y-2">
                             <h4 class="font-bold text-blue-950 text-sm flex items-center gap-1.5">
-                                <i class="fa-solid fa-bullseye text-blue-700"></i> Target & Program Pembelajaran Santri:
+                                <i class="fa-solid fa-graduation-cap text-blue-700"></i> Target & Program Pembelajaran Santri:
                             </h4>
                             <ol class="space-y-1.5 pl-4 list-decimal text-blue-950">
                                 <li>Santri mampu membaca, menulis, serta berbicara Bahasa Arab secara aktif.</li>
@@ -872,7 +917,7 @@
                             <i class="fa-solid fa-rotate"></i>
                         </div>
                         <div>
-                            <span class="text-[10px] uppercase font-bold text-blue-800">Perkembangan Murojaah (Pengulangan)</span>
+                            <span class="text-[10px] uppercase font-bold text-blue-800">Perkembangan Murojaah & Imtihan</span>
                             <div id="stats-murojaah-val" class="font-bold text-sm text-primary-brown">0 Kali Pengulangan</div>
                         </div>
                     </div>
@@ -880,7 +925,7 @@
 
                 <!-- PILIHAN FILTER WAKTU UNTUK ORANG TUA / WALI -->
                 <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-2 text-xs">
-                    <span class="font-bold text-amber-950"><i class="fa-solid fa-filter mr-1"></i> Filter Riwayat Absensi:</span>
+                    <span class="font-bold text-amber-950"><i class="fa-solid fa-filter mr-1"></i> Filter Riwayat Kegiatan:</span>
                     <div class="flex bg-white p-1 rounded-lg border border-amber-300 w-full sm:w-auto justify-center">
                         <button onclick="gantiFilterWaktuSantri('harian')" id="btn-filter-harian" class="px-3 py-1 rounded-md font-bold bg-primary-brown text-white text-[11px] transition-all flex-1 sm:flex-initial">Harian</button>
                         <button onclick="gantiFilterWaktuSantri('mingguan')" id="btn-filter-mingguan" class="px-3 py-1 rounded-md font-bold text-gray-700 text-[11px] transition-all flex-1 sm:flex-initial">Mingguan (7 Hari)</button>
@@ -890,7 +935,7 @@
 
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center justify-between">
-                        <span><i class="fa-solid fa-wallet mr-1"></i> Riwayat Keuangan & Pos Kegiatan</span>
+                        <span><i class="fa-solid fa-wallet mr-1"></i> Riwayat Keuangan & Pos Kegiatan (Termasuk Belum Terbayar)</span>
                         <span class="text-[10px] font-normal text-gray-500">Live dari Cloud</span>
                     </h4>
                     <div id="container-keuangan-santri" class="space-y-2"></div>
@@ -938,7 +983,7 @@
                     </div>
                     <div class="flex bg-soft-cream p-1 rounded-xl border border-cream text-xs">
                         <button onclick="pilihTipeScan('cepat')" id="btn-tipe-cepat" class="px-3 py-1.5 rounded-lg font-bold bg-primary-brown text-white shadow-sm transition-all">
-                            <i class="fa-solid fa-bolt mr-1"></i> Scan Cepat Beruntun (Bebas Semua Sesi)
+                            <i class="fa-solid fa-bolt mr-1"></i> Scan Cepat Beruntun (Sholat, Sunnah, Kajian, dll)
                         </button>
                         <button onclick="pilihTipeScan('biasa')" id="btn-tipe-biasa" class="px-3 py-1.5 rounded-lg font-bold text-gray-700 hover:text-primary-brown transition-all">
                             <i class="fa-solid fa-hand-pointer mr-1"></i> Scan Biasa (Khusus Tahfidz & Setoran)
@@ -978,7 +1023,7 @@
                 <!-- TIPE 2: SCAN BIASA / INTERAKTIF (KHUSUS TAHFIDZ) -->
                 <div id="container-scan-biasa" class="space-y-4 hidden text-center">
                     <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-left text-xs text-blue-900">
-                        <i class="fa-solid fa-circle-info mr-1"></i> <b>Scan Biasa (Khusus Tahfidz & Setoran):</b> Digunakan untuk menginput kehadiran, Ziyadah, atau Murojaah Tahfidz Pagi / Sore secara rinci.
+                        <i class="fa-solid fa-circle-info mr-1"></i> <b>Scan Biasa (Khusus Tahfidz & Setoran):</b> Pagi & Sore, bisa absen saja, Ziyadah, Murojaah, atau Imtihan secara lengkap.
                     </div>
 
                     <div class="py-2">
@@ -1001,8 +1046,8 @@
                         <div>
                             <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Sesi Tahfidz:</label>
                             <select id="scan-kategori-pilih" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown font-semibold text-primary-brown">
-                                <option value="tahfidz-pagi">Tahfidz Pagi (Absen / Setoran)</option>
-                                <option value="tahfidz-sore">Tahfidz Sore (Absen / Setoran)</option>
+                                <option value="tahfidz-pagi">Tahfidz Pagi</option>
+                                <option value="tahfidz-sore">Tahfidz Sore</option>
                             </select>
                         </div>
 
@@ -1010,12 +1055,12 @@
                         <div id="subform-tahfidz-group" class="space-y-3">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <div>
-                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Status Kehadiran / Jenis Setoran</label>
+                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Jenis Kehadiran / Setoran</label>
                                     <select id="scan-tahfidz-jenis" onchange="gantiJenisTahfidz()" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                                         <option value="Hadir Saja (Absen)">Hadir Saja (Hanya Absen Kehadiran)</option>
                                         <option value="Ziyadah (Hafalan Baru)">Ziyadah (Setor Hafalan Baru)</option>
                                         <option value="Murojaah (Pengulangan)">Murojaah (Setor Pengulangan)</option>
-                                        <option value="Imtihan (Ujian / Tasmi')">Imtihan (Ujian / Tasmi')</option>
+                                        <option value="Imtihan (Ujian Tasmi')">Imtihan (Ujian Tasmi' / 1 Surat)</option>
                                     </select>
                                 </div>
                                 <div id="div-kelancaran-tahfidz">
@@ -1034,24 +1079,24 @@
                                     <input type="text" id="scan-tahfidz-surat" placeholder="Contoh: An-Naba" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                                 </div>
                                 <div>
-                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Rentang Ayat</label>
-                                    <input type="text" id="scan-tahfidz-ayat" placeholder="Contoh: Ayat 1-15" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Rentang Ayat / Selesai</label>
+                                    <input type="text" id="scan-tahfidz-ayat" placeholder="Ayat 1-40 atau Selesai" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                                 </div>
                             </div>
 
                             <div id="tahfidz-murojaah-fields" class="space-y-2 hidden">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <div>
-                                        <label class="block text-[11px] font-bold text-primary-brown mb-1">Dari Surat Awal</label>
+                                        <label class="block text-[11px] font-bold text-primary-brown mb-1" id="label-surat-dari">Dari Surat Awal</label>
                                         <input type="text" id="scan-murojaah-dari" placeholder="An-Nazi'at" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                                     </div>
-                                    <div>
+                                    <div id="div-surat-sampai">
                                         <label class="block text-[11px] font-bold text-primary-brown mb-1">Sampai Surat Akhir</label>
                                         <input type="text" id="scan-murojaah-sampai" placeholder="An-Naba" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                                     </div>
                                 </div>
                                 <div>
-                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Rentang Ayat / Keterangan</label>
+                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Ayat / Keterangan Lain</label>
                                     <input type="text" id="scan-murojaah-ayat" placeholder="Selesai / Ayat 1-40" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                                 </div>
                             </div>
@@ -1069,6 +1114,7 @@
 
         <!-- 4. MENU PANEL PENGURUS -->
         <section id="menu-keterangan" class="space-y-6 hidden">
+            <!-- Tombol Peran Tanpa Menampilkan PIN di Luar -->
             <div id="role-select-box" class="bg-white rounded-2xl p-6 border border-cream shadow-sm space-y-4 max-w-md mx-auto text-center">
                 <div class="w-12 h-12 bg-primary-brown text-white rounded-full flex items-center justify-center mx-auto text-lg font-bold">
                     <i class="fa-solid fa-shield-halved"></i>
@@ -1079,7 +1125,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2 pt-2">
                     <button onclick="pilihPeran('musrif')" class="p-3 bg-soft-cream border border-cream rounded-xl hover:border-primary-brown text-xs font-bold text-primary-brown transition-all">
-                        <i class="fa-solid fa-user-plus block text-lg mb-1"></i> Musrif (Sesi Cepat & Santri)
+                        <i class="fa-solid fa-user-plus block text-lg mb-1"></i> Musrif
                     </button>
                     <button onclick="pilihPeran('bendahara')" class="p-3 bg-soft-cream border border-cream rounded-xl hover:border-primary-brown text-xs font-bold text-primary-brown transition-all">
                         <i class="fa-solid fa-wallet block text-lg mb-1"></i> Bendahara Keuangan
@@ -1109,9 +1155,9 @@
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <div>
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                            <i class="fa-solid fa-bullhorn"></i> Panel Musrif: Sesi Scan Cepat, Koreksi Uzur & Hapus Catatan
+                            <i class="fa-solid fa-bullhorn"></i> Panel Musrif: Sesi Scan Cepat, Koreksi & Kelola Santri
                         </h3>
-                        <p class="text-xs text-gray-600 mt-0.5">Atur sesi scan cepat untuk semua kegiatan (Tahfidz, Sholat, Ba'diyah, Kajian, dll).</p>
+                        <p class="text-xs text-gray-600 mt-0.5">Atur sesi scan cepat untuk semua kegiatan, koreksi/hapus absensi, serta kelola data santri.</p>
                     </div>
                     <button onclick="lockPanel()" class="text-[10px] bg-rose-100 text-rose-800 font-bold px-2.5 py-1.5 rounded-lg hover:bg-rose-200">
                         <i class="fa-solid fa-lock mr-1"></i> Keluar
@@ -1123,10 +1169,6 @@
                     <div>
                         <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Sesi Kegiatan</label>
                         <select id="setting-sesi-kegiatan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown font-bold text-primary-brown">
-                            <optgroup label="Sesi Absensi Tahfidz">
-                                <option value="Tahfidz Pagi">Tahfidz Pagi</option>
-                                <option value="Tahfidz Sore">Tahfidz Sore</option>
-                            </optgroup>
                             <optgroup label="Sholat Wajib Berjamaah">
                                 <option value="Absen Sholat Subuh Berjamaah">Absen Sholat Subuh Berjamaah</option>
                                 <option value="Absen Sholat Dzuhur Berjamaah">Absen Sholat Dzuhur Berjamaah</option>
@@ -1134,13 +1176,15 @@
                                 <option value="Absen Sholat Maghrib Berjamaah">Absen Sholat Maghrib Berjamaah</option>
                                 <option value="Absen Sholat Isya Berjamaah">Absen Sholat Isya Berjamaah</option>
                             </optgroup>
-                            <optgroup label="Sholat Sunnah, Ba'diyah & Kajian">
-                                <option value="Sholat Dhuha">Sholat Dhuha</option>
+                            <optgroup label="Sholat Sunnah & Rawatib">
+                                <option value="Sholat Qobliyah Subuh">Sholat Qobliyah Subuh</option>
                                 <option value="Sholat Qobliyah Dzuhur">Sholat Qobliyah Dzuhur</option>
                                 <option value="Sholat Ba'diyah Dzuhur">Sholat Ba'diyah Dzuhur</option>
-                                <option value="Qobliyah Subuh">Qobliyah Subuh</option>
-                                <option value="Ba'diyah Maghrib">Ba'diyah Maghrib</option>
-                                <option value="Ba'diyah Isya">Ba'diyah Isya</option>
+                                <option value="Sholat Ba'diyah Maghrib">Sholat Ba'diyah Maghrib</option>
+                                <option value="Sholat Ba'diyah Isya">Sholat Ba'diyah Isya</option>
+                                <option value="Sholat Tahajud">Sholat Tahajud</option>
+                            </optgroup>
+                            <optgroup label="Kajian, Muhadhoroh & Amalan Lain">
                                 <option value="Kajian Sore">Kajian Sore</option>
                                 <option value="Kajian Malam">Kajian Malam</option>
                                 <option value="Muhadhoroh">Muhadhoroh</option>
@@ -1155,24 +1199,26 @@
                     <p class="text-[10px] text-gray-500 text-center">Status Sesi Cepat Aktif: <b id="text-status-sesi-aktif" class="text-emerald-700">-</b></p>
                 </div>
 
-                <!-- FITUR KOREKSI UZDUR / IZIN PADA CATATAN KEGIATAN & TAHFIDZ -->
+                <!-- KOREKSI KEGIATAN / UZDUR / HAPUS -->
                 <div class="space-y-3 bg-purple-50 p-4 rounded-xl border border-purple-200">
                     <div class="flex justify-between items-center">
-                        <h4 class="font-bold text-xs text-purple-950"><i class="fa-solid fa-person-walking-arrow-right mr-1"></i> Koreksi Uzur Kegiatan / Tahfidz & Hapus Catatan</h4>
+                        <h4 class="font-bold text-xs text-purple-950"><i class="fa-solid fa-person-walking-arrow-right mr-1"></i> Koreksi Kegiatan, Edit, Uzur & Hapus Catatan</h4>
                         <input type="text" id="search-hapus-kegiatan" onkeyup="filterHapusKegiatan()" placeholder="Cari santri/kegiatan..." class="text-xs px-3 py-1.5 rounded-lg border border-purple-300 bg-white focus:outline-none w-44">
                     </div>
-                    <p class="text-[11px] text-purple-900">Jika santri izin atau berhalangan hadir pada sesi kegiatan apa pun, klik tombol <b>Set Udzur</b> pada riwayat catatannya di bawah ini.</p>
+                    <p class="text-[11px] text-purple-900">Ubah kegiatan jika salah pilih, jadikan <b>Udzur</b>, atau hapus catatan absensi sewaktu-waktu.</p>
                     <div id="list-hapus-kegiatan-container" class="space-y-2 max-h-56 overflow-y-auto"></div>
                 </div>
 
+                <!-- KELOLA DATA SANTRI -->
                 <div class="space-y-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
                     <div class="flex justify-between items-center">
-                        <h4 class="font-bold text-xs text-amber-950"><i class="fa-solid fa-address-book mr-1"></i> Kelola Data, Edit & Keterangan Santri (Sakit / Pulang)</h4>
+                        <h4 class="font-bold text-xs text-amber-950"><i class="fa-solid fa-address-book mr-1"></i> Kelola Data, Edit & Status Santri</h4>
                         <input type="text" id="search-kelola-santri" onkeyup="filterKelolaSantri()" placeholder="Cari santri..." class="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-white focus:outline-none w-48">
                     </div>
                     <div id="list-kelola-santri-container" class="space-y-2 max-h-56 overflow-y-auto"></div>
                 </div>
 
+                <!-- PENDAFTARAN SANTRI BARU -->
                 <div class="space-y-3 bg-white p-4 rounded-xl border border-cream">
                     <h4 class="font-bold text-xs text-primary-brown"><i class="fa-solid fa-user-plus mr-1"></i> Pendaftaran Santri Baru</h4>
                     <div>
@@ -1182,15 +1228,15 @@
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <div>
                             <label class="block text-[11px] font-bold text-gray-700 mb-1">Kelas</label>
-                            <input type="text" id="new-santri-kelas" placeholder="Kelas 7 / Kelas 8 / X" class="w-full text-xs px-3 py-2 rounded-lg border border-cream bg-soft-cream">
+                            <input type="text" id="new-santri-kelas" placeholder="Kelas 7 / X" class="w-full text-xs px-3 py-2 rounded-lg border border-cream bg-soft-cream">
                         </div>
                         <div>
-                            <label class="block text-[11px] font-bold text-gray-700 mb-1">NISN</label>
+                            <label class="block text-[11px] font-bold text-gray-700 mb-1">NISN (Tidak Wajib)</label>
                             <input type="text" id="new-santri-nisn" placeholder="00891234" class="w-full text-xs px-3 py-2 rounded-lg border border-cream bg-soft-cream">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-gray-700 mb-1">Asrama / Kamar</label>
-                            <input type="text" id="new-santri-asrama" placeholder="Asrama Ali bin Abi Thalib" class="w-full text-xs px-3 py-2 rounded-lg border border-cream bg-soft-cream">
+                            <input type="text" id="new-santri-asrama" placeholder="Asrama Utama" class="w-full text-xs px-3 py-2 rounded-lg border border-cream bg-soft-cream">
                         </div>
                     </div>
                     <button onclick="tambahSantriBaruSubmit()" class="w-full bg-emerald-700 text-white text-xs font-bold py-2.5 rounded-lg hover:bg-emerald-800">
@@ -1206,7 +1252,7 @@
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
                             <i class="fa-solid fa-wallet"></i> Panel Bendahara: Rincian Keuangan (Arsip 3 Tahun)
                         </h3>
-                        <p class="text-xs text-gray-600 mt-0.5">Input tagihan baru atau perbarui status pembayaran telat sewaktu-waktu.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">Input pembayaran/tagihan (SPP, Gedung, Seragam, Buku, dll) serta kelola status lunas/belum lunas.</p>
                     </div>
                     <button onclick="lockPanel()" class="text-[10px] bg-rose-100 text-rose-800 font-bold px-2.5 py-1.5 rounded-lg hover:bg-rose-200">
                         <i class="fa-solid fa-lock mr-1"></i> Keluar
@@ -1230,10 +1276,11 @@
                                 <option value="Pembelian Baju Seragam">Pembelian Baju Seragam</option>
                                 <option value="Iuran Kegiatan / Acara Pesantren">Iuran Kegiatan / Acara Pesantren</option>
                                 <option value="Kas / Tabungan Santri">Kas / Tabungan Santri</option>
+                                <option value="Lainnya">Lainnya</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-primary-brown mb-1">Bulan Tagihan / Periode</label>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Bulan / Periode</label>
                             <select id="bendahara-bulan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown">
                                 <option value="Januari">Januari</option>
                                 <option value="Februari">Februari</option>
@@ -1281,7 +1328,7 @@
 
                 <div class="space-y-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                        <h4 class="font-bold text-xs text-amber-900"><i class="fa-solid fa-pen-to-square mr-1"></i> Filter Arsip Keuangan (Hanya Santri Aktif)</h4>
+                        <h4 class="font-bold text-xs text-amber-900"><i class="fa-solid fa-pen-to-square mr-1"></i> Filter Arsip Keuangan (3 Tahun)</h4>
                         <div class="flex items-center gap-2 w-full sm:w-auto">
                             <select id="filter-tahun-bendahara" onchange="muatDataKeuanganUntukUpdate()" class="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-white font-bold text-primary-brown">
                                 <option value="all">Semua Tahun (Arsip 3 Tahun)</option>
@@ -1368,6 +1415,51 @@
         </div>
     </div>
 
+    <!-- MODAL EDIT KEGIATAN / KOREKSI OLEH MUSRIF -->
+    <div id="modal-edit-kegiatan" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-md rounded-2xl p-5 border border-cream shadow-xl space-y-4">
+            <div class="flex justify-between items-center border-b border-cream pb-3">
+                <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
+                    <i class="fa-solid fa-pen"></i> Koreksi Nama Kegiatan Absen
+                </h3>
+                <button onclick="tutupModalEditKegiatan()" class="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded-lg font-bold hover:bg-gray-300">Tutup</button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <input type="hidden" id="edit-kegiatan-id">
+                <div>
+                    <label class="block font-bold text-primary-brown mb-1">Santri</label>
+                    <input type="text" id="edit-kegiatan-santri" readonly class="w-full px-3 py-2 rounded-lg border border-cream bg-soft-cream font-bold text-gray-700">
+                </div>
+                <div>
+                    <label class="block font-bold text-primary-brown mb-1">Ubah Menjadi Kegiatan / Sesi:</label>
+                    <select id="edit-kegiatan-pilihan" class="w-full px-3 py-2.5 rounded-lg border border-cream bg-white font-bold text-primary-brown">
+                        <option value="Absen Sholat Subuh Berjamaah">Absen Sholat Subuh Berjamaah</option>
+                        <option value="Absen Sholat Dzuhur Berjamaah">Absen Sholat Dzuhur Berjamaah</option>
+                        <option value="Absen Sholat Ashar Berjamaah">Absen Sholat Ashar Berjamaah</option>
+                        <option value="Absen Sholat Maghrib Berjamaah">Absen Sholat Maghrib Berjamaah</option>
+                        <option value="Absen Sholat Isya Berjamaah">Absen Sholat Isya Berjamaah</option>
+                        <option value="Sholat Qobliyah Subuh">Sholat Qobliyah Subuh</option>
+                        <option value="Sholat Qobliyah Dzuhur">Sholat Qobliyah Dzuhur</option>
+                        <option value="Sholat Ba'diyah Dzuhur">Sholat Ba'diyah Dzuhur</option>
+                        <option value="Sholat Ba'diyah Maghrib">Sholat Ba'diyah Maghrib</option>
+                        <option value="Sholat Ba'diyah Isya">Sholat Ba'diyah Isya</option>
+                        <option value="Sholat Tahajud">Sholat Tahajud</option>
+                        <option value="Kajian Sore">Kajian Sore</option>
+                        <option value="Kajian Malam">Kajian Malam</option>
+                        <option value="Muhadhoroh">Muhadhoroh</option>
+                        <option value="Membaca Surat Al-Kahfi di Hari Jumat">Membaca Surat Al-Kahfi di Hari Jumat</option>
+                        <option value="Dzikir Pagi & Petang">Dzikir Pagi & Petang</option>
+                        <option value="Tahfidz Pagi">Tahfidz Pagi</option>
+                        <option value="Tahfidz Sore">Tahfidz Sore</option>
+                    </select>
+                </div>
+                <button onclick="simpanPerubahanKegiatanCloud()" class="w-full bg-primary-brown text-white font-bold py-2.5 rounded-xl hover:bg-[#4A3228] transition-colors">
+                    Simpan Perubahan Kegiatan
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL POPUP TOTAL SANTRI -->
     <div id="modal-total-santri" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white w-full max-w-lg rounded-2xl p-5 border border-cream shadow-xl space-y-4 max-h-[80vh] flex flex-col">
@@ -1418,7 +1510,6 @@
 
     <!-- JAVASCRIPT LOGIC -->
     <script>
-        // Fungsi interaktif untuk membuka/menutup Visi Misi
         function toggleVisiMisi() {
             const box = document.getElementById('box-visi-misi');
             if (box.classList.contains('hidden')) {
@@ -1520,18 +1611,9 @@
 
         let activeFilterRentang = 'harian';
         let currentOpenSantriName = "";
-        let currentOpenSantriKelas = "";
-        let currentOpenSantriNisn = "";
-        let currentOpenSantriAsrama = "";
-        let currentOpenSantriKet = "";
 
         function openDetailSantri(nama, kelas, nisn, asrama, ketAbsen) {
             currentOpenSantriName = nama;
-            currentOpenSantriKelas = kelas;
-            currentOpenSantriNisn = nisn;
-            currentOpenSantriAsrama = asrama;
-            currentOpenSantriKet = ketAbsen;
-
             document.getElementById('santri-list-view').classList.add('hidden');
             document.getElementById('santri-detail-view').classList.remove('hidden');
             document.getElementById('det-nama').innerText = nama;
@@ -1629,7 +1711,7 @@
                                 <span class="font-bold text-primary-brown block"><i class="fa-solid fa-graduation-cap text-amber-600 mr-1"></i> Kelas ${kelas}</span>
                                 <span class="text-[10px] text-gray-500">Santri Aktif: ${data.aktif} dari ${data.total} Orang</span>
                             </div>
-                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg font-bold text-xs">${rasioAktif.toFixed(1)}% (Maks 100%)</span>
+                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg font-bold text-xs">${rasioAktif.toFixed(1)}%</span>
                         </div>
                     `;
                 }
@@ -1700,12 +1782,31 @@
             }
         }
 
+        function bukaModalEditKegiatanMusrif(id, namaSantri, kegiatanLama) {
+            document.getElementById('edit-kegiatan-id').value = id;
+            document.getElementById('edit-kegiatan-santri').value = namaSantri;
+            document.getElementById('edit-kegiatan-pilihan').value = kegiatanLama;
+            document.getElementById('modal-edit-kegiatan').classList.remove('hidden');
+        }
+
+        function tutupModalEditKegiatan() {
+            document.getElementById('modal-edit-kegiatan').classList.add('hidden');
+        }
+
+        function simpanPerubahanKegiatanCloud() {
+            const id = document.getElementById('edit-kegiatan-id').value;
+            const kegiatanBaru = document.getElementById('edit-kegiatan-pilihan').value;
+            if (window.editKegiatanMusrifCloud) {
+                window.editKegiatanMusrifCloud(id, kegiatanBaru);
+            }
+        }
+
         let selectedRole = "";
         function pilihPeran(role) {
             selectedRole = role;
             document.getElementById('role-select-box').classList.add('hidden');
             document.getElementById('pin-login-box').classList.remove('hidden');
-            const title = role === 'musrif' ? "PIN Musrif (Sesi Cepat & Santri)" : "PIN Bendahara Keuangan";
+            const title = role === 'musrif' ? "Autentikasi PIN Musrif" : "Autentikasi PIN Bendahara";
             document.getElementById('label-role-title').innerText = title;
         }
 
@@ -1774,7 +1875,7 @@
         }
 
         function muatSesiAktifMusrifUI() {
-            const sesi = localStorage.getItem('sesi_aktif_pesantren') || "Tahfidz Pagi";
+            const sesi = localStorage.getItem('sesi_aktif_pesantren') || "Absen Sholat Subuh Berjamaah";
             const el = document.getElementById('text-status-sesi-aktif');
             if (el) el.innerText = sesi;
             const selectEl = document.getElementById('setting-sesi-kegiatan');
@@ -1782,7 +1883,7 @@
         }
 
         function muatSesiAktifScan() {
-            const sesi = localStorage.getItem('sesi_aktif_pesantren') || "Tahfidz Pagi";
+            const sesi = localStorage.getItem('sesi_aktif_pesantren') || "Absen Sholat Subuh Berjamaah";
             const el = document.getElementById('label-sesi-aktif');
             if (el) el.innerText = sesi;
         }
@@ -1877,6 +1978,8 @@
             const fieldZiyadah = document.getElementById('tahfidz-ziyadah-fields');
             const fieldMurojaah = document.getElementById('tahfidz-murojaah-fields');
             const divKelancaran = document.getElementById('div-kelancaran-tahfidz');
+            const labelSuratDari = document.getElementById('label-surat-dari');
+            const divSuratSampai = document.getElementById('div-surat-sampai');
 
             if (jenis.includes('Hadir')) {
                 fieldZiyadah.classList.add('hidden');
@@ -1887,9 +1990,16 @@
                 if (jenis.includes('Ziyadah')) {
                     fieldZiyadah.classList.remove('hidden');
                     fieldMurojaah.classList.add('hidden');
+                } else if (jenis.includes('Imtihan')) {
+                    fieldZiyadah.classList.add('hidden');
+                    fieldMurojaah.classList.remove('hidden');
+                    labelSuratDari.innerText = "Nama Surat / Ujian";
+                    divSuratSampai.classList.add('hidden');
                 } else {
                     fieldZiyadah.classList.add('hidden');
                     fieldMurojaah.classList.remove('hidden');
+                    labelSuratDari.innerText = "Dari Surat Awal";
+                    divSuratSampai.classList.remove('hidden');
                 }
             }
         }
@@ -1969,7 +2079,16 @@
                         return;
                     }
                     payload.surat = surat;
-                    payload.ayat = ayat || "-";
+                    payload.ayat = ayat || "Selesai";
+                } else if (jenisSetoran.includes('Imtihan')) {
+                    const suratUjian = document.getElementById('scan-murojaah-dari').value.trim();
+                    const ayatUjian = document.getElementById('scan-murojaah-ayat').value.trim();
+                    if (!suratUjian) {
+                        alert("Mohon isi nama surat ujian terlebih dahulu!");
+                        return;
+                    }
+                    payload.surat = `Imtihan: Surat ${suratUjian}`;
+                    payload.ayat = ayatUjian || "Selesai";
                 } else {
                     const dariSurat = document.getElementById('scan-murojaah-dari').value.trim();
                     const sampaiSurat = document.getElementById('scan-murojaah-sampai').value.trim();
@@ -2010,14 +2129,12 @@
                     if (isProcessingScan) return;
                     isProcessingScan = true;
 
-                    const sesiAktif = localStorage.getItem('sesi_aktif_pesantren') || "Tahfidz Pagi";
+                    const sesiAktif = localStorage.getItem('sesi_aktif_pesantren') || "Absen Sholat Subuh Berjamaah";
                     
                     let kategoriTipe = "agenda";
-                    if (sesiAktif.includes("Tahfidz")) {
-                        kategoriTipe = "tahfidz";
-                    } else if (sesiAktif.includes("Sholat") && !sesiAktif.includes("Dhuha") && !sesiAktif.includes("Qobliyah") && !sesiAktif.includes("Ba'diyah")) {
+                    if (sesiAktif.includes("Sholat") && !sesiAktif.includes("Dhuha") && !sesiAktif.includes("Qobliyah") && !sesiAktif.includes("Ba'diyah") && !sesiAktif.includes("Tahajud")) {
                         kategoriTipe = "sholat";
-                    } else if (sesiAktif.includes("Dhuha") || sesiAktif.includes("Qobliyah") || sesiAktif.includes("Ba'diyah") || sesiAktif.includes("Sholat")) {
+                    } else if (sesiAktif.includes("Sholat") || sesiAktif.includes("Qobliyah") || sesiAktif.includes("Ba'diyah") || sesiAktif.includes("Tahajud")) {
                         kategoriTipe = "sunnah";
                     } else {
                         kategoriTipe = "agenda";
@@ -2028,7 +2145,6 @@
                         kategori: kategoriTipe,
                         kegiatan: sesiAktif,
                         amalan: sesiAktif,
-                        sesiTahfidz: sesiAktif.includes("Tahfidz") ? sesiAktif : undefined,
                         catatan: "Dikerjakan",
                         status: "Hadir / Dikerjakan"
                     };
@@ -2045,13 +2161,13 @@
                             alertMsg.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-700 text-2xl mr-2"></i><span class="text-lg">BERHASIL DISIMPAN</span><br><span class="text-xs font-normal">${decodedText} • ${sesiAktif}</span>`;
                         } else {
                             alertBox.className = "p-5 rounded-2xl border bg-amber-100 border-amber-400 text-amber-900 text-center transition-all shadow-md";
-                            alertMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-700 text-2xl mr-2"></i><span class="text-lg">${res.status === "error" ? "GAGAL" : "SUDAH TERCATAT"}</span><br><span class="text-xs font-normal">${res.pesan}</span>`;
+                            alertMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-700 text-2xl mr-2"></i><span class="text-lg">${res.status === "error" ? "GAGAL" : "ANDA TELAH ABSEN"}</span><br><span class="text-xs font-normal">${res.pesan}</span>`;
                         }
 
                         setTimeout(() => {
                             alertBox.classList.add('hidden');
                             isProcessingScan = false;
-                        }, 2300);
+                        }, 2500);
                     }
                 },
                 (errorMessage) => {}
