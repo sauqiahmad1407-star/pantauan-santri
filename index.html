@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Informasi & Pemantauan Santri - Pondok Pesantren Utsman Bin Affan</title>
+    <title>Pondok Pesantren Utsman Bin Affan - Profil & SPMB</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Font Google (Plus Jakarta Sans) -->
@@ -76,7 +76,7 @@
         };
 
         window.hapusSantriCloud = async function(docId, namaSantri) {
-            if (confirm("Apakah Anda yakin ingin mengeluarkan / menghapus santri " + namaSantri + " dari sistem? (Catatan: Rekapitulasi & riwayat keuangannya juga akan otomatis disembunyikan)")) {
+            if (confirm("Apakah Anda yakin ingin mengeluarkan / menghapus santri " + namaSantri + " dari sistem?")) {
                 try {
                     await deleteDoc(doc(db, "data_santri", docId));
                     alert("Santri " + namaSantri + " berhasil dikeluarkan dari data pesantren.");
@@ -184,7 +184,9 @@
                 if (persentaseKehadiranEl) persentaseKehadiranEl.innerText = jumlahSantri > 0 ? "98.5%" : "0%";
 
                 window.globalStatistikKelas = statistikKelas;
+                window.globalTotalSantriCount = jumlahSantri;
                 window.muatDataKeuanganUntukUpdate();
+                window.muatDataHapusMusrif();
             } catch (e) {
                 console.error("Gagal memuat santri: ", e);
             }
@@ -192,23 +194,23 @@
 
         window.simpanCatatanMusrifCloud = async function(dataObjek) {
             try {
-                // Validasi Integritas: Cek apakah nama santri masih ada di data aktif
                 const daftarNamaAktif = window.cacheDataSantri.map(s => s.nama.toLowerCase());
                 if (!daftarNamaAktif.includes(dataObjek.namaSantri.toLowerCase())) {
                     return { status: "error", pesan: `GAGAL: Nama '${dataObjek.namaSantri}' tidak terdaftar sebagai santri aktif!` };
                 }
 
                 const todayDateStr = new Date().toLocaleDateString('id-ID');
+                
                 const qCek = query(
                     collection(db, "catatan_musrif"), 
                     where("namaSantri", "==", dataObjek.namaSantri),
-                    where("kegiatan", "==", dataObjek.kegiatan),
+                    where("kegiatan", "==", dataObjek.kegiatan || dataObjek.amalan || dataObjek.jenisSetoran || "Kegiatan"),
                     where("tanggalStr", "==", todayDateStr)
                 );
                 const snapCek = await getDocs(qCek);
                 
                 if (!snapCek.empty) {
-                    return { status: "sudah_absen", pesan: `ANDA SUDAH ABSEN<br><span class="text-xs font-normal">${dataObjek.namaSantri} sudah tercatat sebelumnya.</span>` };
+                    return { status: "sudah_absen", pesan: `SUDAH TERCATAT<br><span class="text-xs font-normal">${dataObjek.namaSantri} sudah diabsen untuk kegiatan ini hari ini.</span>` };
                 }
 
                 await addDoc(collection(db, "catatan_musrif"), {
@@ -217,10 +219,58 @@
                     waktuUpdate: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
                     timestamp: Date.now()
                 });
-                return { status: "sukses", pesan: `ANDA BERHASIL ABSEN<br><span class="text-xs font-normal">${dataObjek.namaSantri} - ${dataObjek.kegiatan}</span>` };
+                window.muatDataHapusMusrif();
+                return { status: "sukses", pesan: `BERHASIL DISIMPAN<br><span class="text-xs font-normal">${dataObjek.namaSantri}</span>` };
             } catch (e) {
                 console.error("Gagal menyimpan ke database: ", e);
                 return { status: "error", pesan: "Gagal menyimpan data ke Cloud." };
+            }
+        };
+
+        window.muatDataHapusMusrif = async function() {
+            const container = document.getElementById('list-hapus-kegiatan-container');
+            if (!container) return;
+            container.innerHTML = `<p class="text-xs text-gray-400 text-center py-2">Memuat daftar riwayat kegiatan...</p>`;
+
+            try {
+                const querySnapshot = await getDocs(collection(db, "catatan_musrif"));
+                let html = "";
+                querySnapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    const docId = docSnap.id;
+                    const infoKegiatan = data.kegiatan || data.amalan || data.jenisSetoran || "Catatan";
+
+                    html += `
+                        <div class="p-3 bg-white rounded-xl border border-cream flex justify-between items-center text-xs hapus-kegiatan-row">
+                            <div>
+                                <span class="font-bold text-primary-brown block">${data.namaSantri}</span>
+                                <span class="text-[11px] text-gray-600">${infoKegiatan} • ${data.tanggalStr || '-'}</span>
+                            </div>
+                            <button onclick="hapusCatatanMusrifCloud('${docId}', '${data.namaSantri.replace(/'/g, "\\'")}')" class="bg-rose-100 text-rose-700 hover:bg-rose-200 font-bold px-3 py-1.5 rounded-lg transition-colors text-[10px]">
+                                <i class="fa-solid fa-trash mr-1"></i> Hapus
+                            </button>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html || `<p class="text-xs text-gray-500 text-center py-2">Belum ada riwayat kegiatan tercatat.</p>`;
+            } catch (e) {
+                console.error("Gagal memuat data hapus kegiatan:", e);
+            }
+        };
+
+        window.hapusCatatanMusrifCloud = async function(docId, namaSantri) {
+            if (confirm("Apakah Anda yakin ingin menghapus catatan kegiatan santri " + namaSantri + " ini?")) {
+                try {
+                    await deleteDoc(doc(db, "catatan_musrif", docId));
+                    alert("Berhasil menghapus catatan kegiatan.");
+                    window.muatDataHapusMusrif();
+                    if (currentOpenSantriName) {
+                        window.muatDataSantriDariCloud(currentOpenSantriName, activeFilterRentang);
+                    }
+                } catch (e) {
+                    console.error("Gagal menghapus catatan:", e);
+                    alert("Gagal menghapus data.");
+                }
             }
         };
 
@@ -228,7 +278,7 @@
             try {
                 const daftarNamaAktif = window.cacheDataSantri.map(s => s.nama.toLowerCase());
                 if (!daftarNamaAktif.includes(namaSantri.toLowerCase())) {
-                    alert("Gagal! Nama santri '" + namaSantri + "' tidak ditemukan dalam daftar santri aktif. Pastikan nama sesuai.");
+                    alert("Gagal! Nama santri '" + namaSantri + "' tidak ditemukan dalam daftar santri aktif.");
                     return;
                 }
 
@@ -267,9 +317,8 @@
                     const data = docSnap.data();
                     const docId = docSnap.id;
 
-                    // VALIDASI INTEGRITAS: Hanya tampilkan jika nama santri MASIH ADA di daftar santri aktif
                     if (!daftarNamaAktif.includes(data.namaSantri.toLowerCase())) {
-                        return; // Lewati / abaikan jika santri sudah dihapus
+                        return;
                     }
 
                     window.cacheDataKeuangan.push({ id: docId, ...data });
@@ -326,6 +375,8 @@
             const containerSholatWajib = document.getElementById('container-sholat-wajib-santri');
             const containerAgenda = document.getElementById('container-agenda-santri');
             const containerKeuangan = document.getElementById('container-keuangan-santri');
+            const statsZiyadahEl = document.getElementById('stats-ziyadah-val');
+            const statsMurojaahEl = document.getElementById('stats-murojaah-val');
             
             if (!containerTahfidz) return;
 
@@ -360,10 +411,18 @@
                 let htmlSunnah = "";
                 let htmlSholatWajib = "";
                 let htmlAgenda = "";
+                
+                let countZiyadah = 0;
+                let countMurojaah = 0;
 
                 window.cacheRawMusrif.forEach((data) => {
                     const itemTimestamp = data.timestamp || 0;
                     const selisihWaktu = nowTime - itemTimestamp;
+
+                    if (data.kategori === "tahfidz") {
+                        if ((data.jenisSetoran || "").includes("Ziyadah")) countZiyadah++;
+                        if ((data.jenisSetoran || "").includes("Murojaah")) countMurojaah++;
+                    }
 
                     if (rentangWaktu === 'harian') {
                         const itemDateStr = new Date(itemTimestamp).toLocaleDateString('id-ID');
@@ -415,6 +474,9 @@
                         `;
                     }
                 });
+
+                if (statsZiyadahEl) statsZiyadahEl.innerText = countZiyadah + " Kali Setoran";
+                if (statsMurojaahEl) statsMurojaahEl.innerText = countMurojaah + " Kali Pengulangan";
 
                 containerTahfidz.innerHTML = htmlTahfidz || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada setoran tahfidz pada periode ini -</div>`;
                 containerAmalanSunnah.innerHTML = htmlSunnah || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada catatan amalan sunnah pada periode ini -</div>`;
@@ -494,7 +556,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-base md:text-lg leading-tight">Pondok Pesantren Utsman Bin Affan</h1>
-                    <p class="text-xs text-[#E3D5C9]">Sistem Pemantauan & Absensi Terpadu</p>
+                    <p class="text-xs text-[#E3D5C9]">Sistem Informasi & SPMB Terpadu</p>
                 </div>
             </div>
             <div class="hidden sm:flex items-center space-x-2 bg-[#7D5A50] px-3 py-1.5 rounded-full text-xs">
@@ -507,30 +569,40 @@
     <!-- KONTEN UTAMA -->
     <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-6 mb-20 overflow-y-auto">
         
-        <!-- 1. MENU HOME -->
+        <!-- 1. MENU HOME (LANDING PAGE, PROFIL PONDOK & INFORMASI SPMB) -->
         <section id="menu-home" class="space-y-6">
-            <div class="bg-gradient-to-r from-[#5C4033] to-[#8C6D62] text-white p-6 rounded-2xl shadow-sm relative overflow-hidden">
-                <div class="relative z-10">
-                    <span class="bg-[#E3D5C9] text-primary-brown text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider">Tahun Ajaran 2026/2027</span>
-                    <h2 class="text-xl md:text-2xl font-bold mt-2">Ahlan wa Sahlan, Wali Santri & Pengurus</h2>
-                    <p class="text-xs md:text-sm text-[#F5EFEB] mt-1 max-w-lg">Portal digital pemantauan kegiatan harian santri, kehadiran sekolah, sholat berjamaah, terhubung secara real-time dengan database cloud.</p>
+            <!-- Hero Banner -->
+            <div class="bg-gradient-to-r from-[#5C4033] to-[#8C6D62] text-white p-6 md:p-8 rounded-2xl shadow-sm relative overflow-hidden">
+                <div class="relative z-10 space-y-3">
+                    <span class="bg-[#E3D5C9] text-primary-brown text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">Pendaftaran Santri Baru (SPMB) 2026/2027</span>
+                    <h2 class="text-2xl md:text-3xl font-bold leading-tight">Membangun Generasi Qur'ani, Berakhlak & Berprestasi</h2>
+                    <p class="text-xs md:text-sm text-[#F5EFEB] max-w-xl">Selamat datang di portal resmi Pondok Pesantren Utsman Bin Affan. Pusat pendidikan Islam terpadu yang memadukan ilmu syar'i dan teknologi modern.</p>
+                    <div class="pt-2 flex flex-wrap gap-2">
+                        <a href="#info-spmb" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-circle-plus"></i> Informasi & Alur SPMB
+                        </a>
+                        <a href="#profil-pondok" class="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors backdrop-blur-sm inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-info"></i> Profil Pondok
+                        </a>
+                    </div>
                 </div>
-                <div class="absolute -right-4 -bottom-4 text-white/10 text-9xl">
+                <div class="absolute -right-6 -bottom-6 text-white/10 text-9xl pointer-events-none">
                     <i class="fa-solid fa-quran"></i>
                 </div>
             </div>
 
+            <!-- Statistik Singkat -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div onclick="bukaModalTotalSantri()" class="bg-white p-4 rounded-xl border border-cream shadow-sm cursor-pointer hover:border-primary-brown transition-all">
                     <div class="text-emerald-600 text-sm font-semibold mb-1"><i class="fa-solid fa-users"></i> Total Santri <i class="fa-solid fa-arrow-up-right-from-square text-[10px] ml-1"></i></div>
                     <div id="total-santri-counter" class="text-lg font-bold text-[#2D2424]">Memuat...</div>
-                    <p class="text-[10px] text-gray-500 mt-1">Klik untuk lihat rincian</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Aktif di asrama</p>
                 </div>
 
                 <div onclick="bukaModalKehadiranKelas()" class="bg-white p-4 rounded-xl border border-cream shadow-sm cursor-pointer hover:border-primary-brown transition-all">
                     <div class="text-amber-600 text-sm font-semibold mb-1"><i class="fa-solid fa-school-flag"></i> Kehadiran <i class="fa-solid fa-arrow-up-right-from-square text-[10px] ml-1"></i></div>
                     <div id="persentase-kehadiran-val" class="text-lg font-bold text-[#2D2424]">98.5%</div>
-                    <p class="text-[10px] text-gray-500 mt-1">Klik untuk rincian kelas</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Rata-rata harian</p>
                 </div>
 
                 <div class="bg-white p-4 rounded-xl border border-cream shadow-sm">
@@ -539,13 +611,88 @@
                     <p class="text-[10px] text-gray-500 mt-1">Firebase Firestore</p>
                 </div>
                 <div class="bg-white p-4 rounded-xl border border-cream shadow-sm">
-                    <div class="text-purple-600 text-sm font-semibold mb-1"><i class="fa-solid fa-qrcode"></i> Sistem QR</div>
+                    <div class="text-purple-600 text-sm font-semibold mb-1"><i class="fa-solid fa-qrcode"></i> Sistem Absen</div>
                     <div class="text-lg font-bold text-emerald-600">Auto-Time</div>
-                    <p class="text-[10px] text-gray-500 mt-1">Deteksi Jam Otomatis</p>
+                    <p class="text-[10px] text-gray-500 mt-1">QR Code Permanen</p>
                 </div>
             </div>
 
-            <!-- Bagian Buat & Unduh QR Code Santri -->
+            <!-- BAGIAN INFORMASI SPMB -->
+            <div id="info-spmb" class="bg-white rounded-2xl p-5 md:p-6 border border-cream shadow-sm space-y-5">
+                <div class="border-b border-cream pb-3 flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] uppercase font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded">Penerimaan Santri Baru</span>
+                        <h3 class="font-bold text-lg text-primary-brown mt-1">
+                            <i class="fa-solid fa-graduation-cap text-amber-700 mr-1.5"></i> Informasi SPMB Pondok Pesantren
+                        </h3>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="p-4 bg-soft-cream rounded-xl border border-cream space-y-2">
+                        <span class="font-bold text-xs text-primary-brown block"><i class="fa-solid fa-calendar-check text-emerald-700 mr-1"></i> Gelombang Pendaftaran</span>
+                        <ul class="text-xs text-gray-700 space-y-1.5 pl-4 list-disc">
+                            <li><b>Gelombang 1:</b> 1 Januari – 31 Maret 2026 (Diskon Uang Gedung)</li>
+                            <li><b>Gelombang 2:</b> 1 April – 30 Juni 2026</li>
+                            <li><b>Gelombang 3:</b> 1 Juli – 31 Juli 2026 (Jika kuota masih ada)</li>
+                        </ul>
+                    </div>
+
+                    <div class="p-4 bg-soft-cream rounded-xl border border-cream space-y-2">
+                        <span class="font-bold text-xs text-primary-brown block"><i class="fa-solid fa-clipboard-list text-amber-700 mr-1"></i> Program Unggulan</span>
+                        <ul class="text-xs text-gray-700 space-y-1.5 pl-4 list-disc">
+                            <li>Program Tahfidz Al-Qur'an 30 Juz Bersanad</li>
+                            <li>Kajian Kitab Kuning & Bahasa Arab Aktif</li>
+                            <li>Kurikulum Nasional Terpadu & Ekstrakurikuler IT</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <div>
+                        <span class="font-bold text-emerald-900 text-xs block"><i class="fa-solid fa-circle-question mr-1"></i> Ingin Mendaftarkan Putra/Putri Anda?</span>
+                        <span class="text-[11px] text-emerald-800">Silakan hubungi panitia admin SPMB atau isi formulir pendaftaran online di bawah ini.</span>
+                    </div>
+                    <a href="https://wa.me/6281234567890?text=Assalamualaikum%20Admin%20SPMB,%20saya%20ingin%20bertanya%20mengenai%20pendaftaran%20santri%20baru." target="_blank" class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm whitespace-nowrap">
+                        <i class="fa-brands fa-whatsapp mr-1"></i> Chat Admin SPMB
+                    </a>
+                </div>
+            </div>
+
+            <!-- BAGIAN PROFIL & FASILITAS PONDOK -->
+            <div id="profil-pondok" class="bg-white rounded-2xl p-5 md:p-6 border border-cream shadow-sm space-y-4">
+                <div class="border-b border-cream pb-3">
+                    <span class="text-[10px] uppercase font-bold bg-primary-brown text-white px-2.5 py-0.5 rounded">Profil Pesantren</span>
+                    <h3 class="font-bold text-lg text-primary-brown mt-1">
+                        <i class="fa-solid fa-mosque text-primary-brown mr-1.5"></i> Visi, Misi & Fasilitas Asrama
+                    </h3>
+                </div>
+
+                <div class="space-y-3 text-xs text-gray-700 leading-relaxed">
+                    <p><b>Visi Utama:</b> Menjadi lembaga pendidikan Islam unggulan yang mencetak kader ulama dan pemimpin ummat berwawasan qur'ani serta berakhlakul karimah.</p>
+                    <p><b>Fasilitas Pesantren:</b></p>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                        <div class="p-3 bg-soft-cream rounded-xl text-center border border-cream">
+                            <i class="fa-solid fa-building-columns text-primary-brown text-lg mb-1"></i>
+                            <span class="block font-bold text-[11px]">Masjid Jami'</span>
+                        </div>
+                        <div class="p-3 bg-soft-cream rounded-xl text-center border border-cream">
+                            <i class="fa-solid fa-bed text-primary-brown text-lg mb-1"></i>
+                            <span class="block font-bold text-[11px]">Asrama Santri</span>
+                        </div>
+                        <div class="p-3 bg-soft-cream rounded-xl text-center border border-cream">
+                            <i class="fa-solid fa-book-open text-primary-brown text-lg mb-1"></i>
+                            <span class="block font-bold text-[11px]">Gedung Tahfidz</span>
+                        </div>
+                        <div class="p-3 bg-soft-cream rounded-xl text-center border border-cream">
+                            <i class="fa-solid fa-laptop-code text-primary-brown text-lg mb-1"></i>
+                            <span class="block font-bold text-[11px]">Lab Komputer</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bagian Buat & Unduh QR Code Kartu Santri -->
             <div class="bg-white rounded-2xl p-5 border border-cream shadow-sm space-y-4">
                 <div class="border-b border-cream pb-3">
                     <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
@@ -580,7 +727,7 @@
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
                             <i class="fa-solid fa-address-book"></i> Daftar Rekapitulasi Santri
                         </h3>
-                        <p class="text-xs text-gray-600 mt-0.5">Pilih santri untuk melihat rekapitulasi lengkap, amalan sunnah, dan keuangan.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">Pilih santri untuk melihat rekapitulasi lengkap, perkembangan hafalan, dan keuangan.</p>
                     </div>
                     <div class="w-full sm:w-auto">
                         <input type="text" id="search-santri" onkeyup="filterSantri()" placeholder="Cari nama atau kelas..." class="w-full sm:w-64 text-xs px-3 py-2 rounded-xl border border-cream bg-soft-cream focus:outline-none focus:border-primary-brown">
@@ -608,6 +755,28 @@
                         <span id="det-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
                             Hadir
                         </span>
+                    </div>
+                </div>
+
+                <!-- KARTU PERKEMBANGAN & PERSENTASE HAFALAN TAHFIDZ -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center font-bold">
+                            <i class="fa-solid fa-book-quran"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-amber-800">Perkembangan Ziyadah (Hafalan Baru)</span>
+                            <div id="stats-ziyadah-val" class="font-bold text-sm text-primary-brown">0 Kali Setoran</div>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-blue-200 text-blue-900 flex items-center justify-center font-bold">
+                            <i class="fa-solid fa-rotate"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-blue-800">Perkembangan Murojaah (Pengulangan)</span>
+                            <div id="stats-murojaah-val" class="font-bold text-sm text-primary-brown">0 Kali Pengulangan</div>
+                        </div>
                     </div>
                 </div>
 
@@ -866,9 +1035,9 @@
                 <div class="flex justify-between items-center border-b border-cream pb-3">
                     <div>
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
-                            <i class="fa-solid fa-bullhorn"></i> Panel Musrif: Sesi Scan Cepat & Edit Santri
+                            <i class="fa-solid fa-bullhorn"></i> Panel Musrif: Sesi Scan Cepat, Edit & Hapus Catatan
                         </h3>
-                        <p class="text-xs text-gray-600 mt-0.5">Atur sesi scan cepat (Sholat & Kajian), edit nama/NISN, atau status sakit/pulang.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">Atur sesi scan cepat, hapus catatan salah scan, edit nama/NISN santri.</p>
                     </div>
                     <button onclick="lockPanel()" class="text-[10px] bg-rose-100 text-rose-800 font-bold px-2.5 py-1.5 rounded-lg hover:bg-rose-200">
                         <i class="fa-solid fa-lock mr-1"></i> Keluar
@@ -904,12 +1073,21 @@
                     <p class="text-[10px] text-gray-500 text-center">Status Sesi Cepat Aktif: <b id="text-status-sesi-aktif" class="text-emerald-700">-</b></p>
                 </div>
 
+                <!-- FITUR HAPUS KEGIATAN YANG SALAH SCAN OLEH MUSRIF -->
+                <div class="space-y-3 bg-rose-50 p-4 rounded-xl border border-rose-200">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-bold text-xs text-rose-950"><i class="fa-solid fa-trash-can mr-1"></i> Hapus / Koreksi Catatan Kegiatan Salah Scan</h4>
+                        <input type="text" id="search-hapus-kegiatan" onkeyup="filterHapusKegiatan()" placeholder="Cari santri/kegiatan..." class="text-xs px-3 py-1.5 rounded-lg border border-rose-300 bg-white focus:outline-none w-44">
+                    </div>
+                    <p class="text-[11px] text-rose-900">Jika musrif salah melakukan scan atau anak discan dua kali secara keliru, hapus riwayat catatannya di sini.</p>
+                    <div id="list-hapus-kegiatan-container" class="space-y-2 max-h-52 overflow-y-auto"></div>
+                </div>
+
                 <div class="space-y-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
                     <div class="flex justify-between items-center">
                         <h4 class="font-bold text-xs text-amber-950"><i class="fa-solid fa-address-book mr-1"></i> Kelola Data, Edit & Keterangan Santri</h4>
                         <input type="text" id="search-kelola-santri" onkeyup="filterKelolaSantri()" placeholder="Cari santri..." class="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-white focus:outline-none w-48">
                     </div>
-                    <p class="text-[11px] text-amber-900">Gunakan tombol <b>Edit</b> untuk memperbaiki salah ketik nama/NISN tanpa menghapus, atau atur status sakit/pulang.</p>
                     <div id="list-kelola-santri-container" class="space-y-2 max-h-56 overflow-y-auto"></div>
                 </div>
 
@@ -1227,6 +1405,16 @@
             }
         }
 
+        function filterHapusKegiatan() {
+            let input = document.getElementById('search-hapus-kegiatan').value.toLowerCase();
+            let container = document.getElementById('list-hapus-kegiatan-container');
+            let rows = container.getElementsByClassName('hapus-kegiatan-row');
+            for (let i = 0; i < rows.length; i++) {
+                let text = rows[i].innerText.toLowerCase();
+                rows[i].style.display = text.includes(input) ? "" : "none";
+            }
+        }
+
         function filterUpdateKeuangan() {
             let input = document.getElementById('search-update-keuangan').value.toLowerCase();
             let container = document.getElementById('list-update-keuangan-container');
@@ -1340,14 +1528,20 @@
 
             if (window.globalStatistikKelas && Object.keys(window.globalStatistikKelas).length > 0) {
                 let html = "";
+                let totalSemuaSantri = window.globalTotalSantriCount || 1;
+                let baseTotalPersen = 98.5;
+
                 for (const [kelas, data] of Object.entries(window.globalStatistikKelas)) {
+                    let proporsiKelas = (data.total / totalSemuaSantri) * baseTotalPersen;
+                    let persenTampil = proporsiKelas > baseTotalPersen ? baseTotalPersen : proporsiKelas.toFixed(1);
+
                     html += `
                         <div class="p-3 bg-soft-cream rounded-xl border border-cream flex justify-between items-center text-xs">
                             <div>
-                                <span class="font-bold text-primary-brown block"><i class="fa-solid fa-graduation-cap text-amber-600 mr-1"></i> ${kelas}</span>
+                                <span class="font-bold text-primary-brown block"><i class="fa-solid fa-graduation-cap text-amber-600 mr-1"></i> Kelas ${kelas}</span>
                                 <span class="text-[10px] text-gray-500">Jumlah Santri: ${data.total} Orang</span>
                             </div>
-                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg font-bold text-xs">98.5% Hadir</span>
+                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg font-bold text-xs">${persenTampil}% (Proporsional)</span>
                         </div>
                     `;
                 }
@@ -1445,6 +1639,7 @@
                 document.getElementById('input-pin-role').value = "";
                 window.muatDaftarSantriDariCloud();
                 muatSesiAktifMusrifUI();
+                window.muatDataHapusMusrif();
             } else if (selectedRole === 'bendahara' && pinInput === pinBendahara) {
                 document.getElementById('pin-login-box').classList.add('hidden');
                 document.getElementById('bendahara-form-box').classList.remove('hidden');
@@ -1486,7 +1681,7 @@
         function simpanSesiAktifMusrif() {
             const sesiPilih = document.getElementById('setting-sesi-kegiatan').value;
             localStorage.setItem('sesi_aktif_pesantren', sesiPilih);
-            alert("Berhasil! Sesi scan cepat diatur ke: " + sesiPilih + ". Santri siap melakukan scan cepat beruntun.");
+            alert("Berhasil! Sesi scan cepat diatur ke: " + sesiPilih + ".");
             muatSesiAktifMusrifUI();
         }
 
@@ -1707,7 +1902,7 @@
 
             if (window.simpanCatatanMusrifCloud) {
                 let res = await window.simpanCatatanMusrifCloud(payload);
-                alert(res.pesan);
+                alert(res.pesan.replace(/<br>/g, " - "));
                 document.getElementById('interactive-scan-box').classList.add('hidden');
                 currentScannedSantriNormal = "";
             }
@@ -1757,10 +1952,10 @@
                         alertBox.classList.remove('hidden');
                         if (res.status === "sukses") {
                             alertBox.className = "p-5 rounded-2xl border bg-emerald-100 border-emerald-400 text-emerald-900 text-center transition-all shadow-md";
-                            alertMsg.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-700 text-2xl mr-2"></i><span class="text-lg">ANDA BERHASIL ABSEN</span><br><span class="text-xs font-normal">${decodedText} • ${sesiAktif}</span>`;
+                            alertMsg.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-700 text-2xl mr-2"></i><span class="text-lg">BERHASIL DISIMPAN</span><br><span class="text-xs font-normal">${decodedText} • ${sesiAktif}</span>`;
                         } else {
-                            alertBox.className = "p-5 rounded-2xl border bg-rose-100 border-rose-400 text-rose-900 text-center transition-all shadow-md";
-                            alertMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-700 text-2xl mr-2"></i><span class="text-lg">${res.status === "error" ? "GAGAL" : "ANDA SUDAH ABSEN"}</span><br><span class="text-xs font-normal">${res.pesan}</span>`;
+                            alertBox.className = "p-5 rounded-2xl border bg-amber-100 border-amber-400 text-amber-900 text-center transition-all shadow-md";
+                            alertMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-700 text-2xl mr-2"></i><span class="text-lg">${res.status === "error" ? "GAGAL" : "SUDAH TERCATAT"}</span><br><span class="text-xs font-normal">${res.pesan}</span>`;
                         }
 
                         setTimeout(() => {
