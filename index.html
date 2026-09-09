@@ -44,7 +44,7 @@
                     kelas: kelas,
                     nisn: nisn,
                     asrama: asrama,
-                    keteranganAbsen: "Hadir",
+                    keteranganAbsen: "Aktif",
                     waktuDibuat: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
                     timestamp: Date.now()
                 });
@@ -129,12 +129,15 @@
 
                     let kelasKey = data.kelas || "Lainnya";
                     if (!statistikKelas[kelasKey]) {
-                        statistikKelas[kelasKey] = { total: 0 };
+                        statistikKelas[kelasKey] = { total: 0, aktif: 0 };
                     }
                     statistikKelas[kelasKey].total++;
+                    if ((data.keteranganAbsen || "Aktif") === "Aktif") {
+                        statistikKelas[kelasKey].aktif++;
+                    }
 
                     const inisial = data.nama.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
-                    const ketAbsen = data.keteranganAbsen || "Hadir";
+                    const ketAbsen = data.keteranganAbsen || "Aktif";
 
                     let badgeColor = "bg-emerald-100 text-emerald-800";
                     if (ketAbsen === "Sakit") badgeColor = "bg-amber-100 text-amber-800";
@@ -163,7 +166,7 @@
                             </div>
                             <div class="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end">
                                 <select onchange="updateKeteranganAbsenCloud('${docId}', this.value)" class="text-[10px] px-2.5 py-1.5 rounded-lg border border-cream bg-soft-cream font-bold text-primary-brown">
-                                    <option value="Hadir" ${ketAbsen === 'Hadir' ? 'selected' : ''}>Hadir (Normal)</option>
+                                    <option value="Aktif" ${ketAbsen === 'Aktif' ? 'selected' : ''}>Aktif</option>
                                     <option value="Sakit" ${ketAbsen === 'Sakit' ? 'selected' : ''}>Sakit</option>
                                     <option value="Pulang / Izin" ${ketAbsen === 'Pulang / Izin' ? 'selected' : ''}>Pulang / Izin</option>
                                 </select>
@@ -181,7 +184,20 @@
                 if (container) container.innerHTML = htmlList || `<div class="p-4 bg-soft-cream rounded-xl text-center text-xs text-gray-500">Belum ada data santri.</div>`;
                 if (listKelolaContainer) listKelolaContainer.innerHTML = htmlKelola || `<div class="p-3 text-center text-xs text-gray-500">Belum ada santri terdaftar.</div>`;
                 if (totalSantriHome) totalSantriHome.innerText = jumlahSantri + " Santri";
-                if (persentaseKehadiranEl) persentaseKehadiranEl.innerText = jumlahSantri > 0 ? "98.5%" : "0%";
+
+                let daftarKelasKeys = Object.keys(statistikKelas);
+                let jumlahKelasTotal = daftarKelasKeys.length > 0 ? daftarKelasKeys.length : 1;
+                let totalPersenAkumulasi = 0;
+
+                for (const [k, d] of Object.entries(statistikKelas)) {
+                    let rasioKeaktifanSantriKelas = d.total > 0 ? (d.aktif / d.total) : 0;
+                    totalPersenAkumulasi += (rasioKeaktifanSantriKelas * 100);
+                }
+
+                let rataRataKehadiranPesantren = totalPersenAkumulasi / jumlahKelasTotal;
+                if (persentaseKehadiranEl) {
+                    persentaseKehadiranEl.innerText = jumlahSantri > 0 ? rataRataKehadiranPesantren.toFixed(1) + "%" : "0%";
+                }
 
                 window.globalStatistikKelas = statistikKelas;
                 window.globalTotalSantriCount = jumlahSantri;
@@ -200,11 +216,12 @@
                 }
 
                 const todayDateStr = new Date().toLocaleDateString('id-ID');
+                const infoUnikCek = dataObjek.amalan || dataObjek.kegiatan || dataObjek.jenisSetoran || "Kegiatan";
                 
                 const qCek = query(
                     collection(db, "catatan_musrif"), 
                     where("namaSantri", "==", dataObjek.namaSantri),
-                    where("kegiatan", "==", dataObjek.kegiatan || dataObjek.amalan || dataObjek.jenisSetoran || "Kegiatan"),
+                    where("kegiatan", "==", infoUnikCek),
                     where("tanggalStr", "==", todayDateStr)
                 );
                 const snapCek = await getDocs(qCek);
@@ -215,6 +232,7 @@
 
                 await addDoc(collection(db, "catatan_musrif"), {
                     ...dataObjek,
+                    kegiatan: infoUnikCek,
                     tanggalStr: todayDateStr,
                     waktuUpdate: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
                     timestamp: Date.now()
@@ -238,7 +256,7 @@
                 querySnapshot.forEach((docSnap) => {
                     const data = docSnap.data();
                     const docId = docSnap.id;
-                    const infoKegiatan = data.kegiatan || data.amalan || data.jenisSetoran || "Catatan";
+                    const infoKegiatan = data.amalan || data.kegiatan || data.jenisSetoran || "Catatan";
                     const isUdzur = data.status === "Izin / Uzur (Kamar Mandi / Halangan)";
                     const badgeUdzur = isUdzur ? `<span class="bg-purple-100 text-purple-800 text-[9px] px-2 py-0.5 rounded font-bold mr-1">Udzur</span>` : "";
 
@@ -249,7 +267,7 @@
                                 <span class="text-[11px] text-gray-600">${infoKegiatan} • ${data.tanggalStr || '-'}</span>
                             </div>
                             <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-                                <button onclick="ubahUdzurCatatanMusrif('${docId}', '${isUdzur ? 'Hadir' : 'Udzur'}')" class="bg-purple-100 text-purple-800 hover:bg-purple-200 font-bold px-2.5 py-1.5 rounded-lg transition-colors text-[10px]">
+                                <button onclick="ubahUdzurCatatanMusrif('${docId}', '${isUdzur ? 'Aktif' : 'Udzur'}')" class="bg-purple-100 text-purple-800 hover:bg-purple-200 font-bold px-2.5 py-1.5 rounded-lg transition-colors text-[10px]">
                                     <i class="fa-solid fa-person-walking-arrow-right mr-1"></i> ${isUdzur ? 'Batalkan Uzur' : 'Set Udzur'}
                                 </button>
                                 <button onclick="hapusCatatanMusrifCloud('${docId}', '${data.namaSantri.replace(/'/g, "\\'")}')" class="bg-rose-100 text-rose-700 hover:bg-rose-200 font-bold px-2.5 py-1.5 rounded-lg transition-colors text-[10px]">
@@ -268,7 +286,7 @@
         window.ubahUdzurCatatanMusrif = async function(docId, statusAksi) {
             try {
                 const docRef = doc(db, "catatan_musrif", docId);
-                const statusBaru = statusAksi === 'Udzur' ? "Izin / Uzur (Kamar Mandi / Halangan)" : "Dikerjakan / Hadir";
+                const statusBaru = statusAksi === 'Udzur' ? "Izin / Uzur (Kamar Mandi / Halangan)" : "Dikerjakan";
                 await updateDoc(docRef, {
                     keterangan: statusBaru,
                     status: statusBaru,
@@ -464,22 +482,27 @@
                     const badgeKetClass = isUdzurItem ? "bg-purple-100 text-purple-800" : "bg-emerald-100 text-emerald-800";
 
                     if (data.kategori === "tahfidz") {
+                        const infoSetoran = data.surat ? `<span class="font-bold text-xs text-primary-brown block mt-1"><i class="fa-solid fa-book-quran text-amber-700 mr-1"></i> ${data.surat} (Ayat: ${data.ayat})</span>` : `<span class="text-[11px] text-gray-600 block mt-0.5">Absensi Kehadiran Tahfidz</span>`;
+                        const statusKet = isUdzurItem ? ketStatus : (data.status || "Hadir / Setor");
+
                         htmlTahfidz += `
-                            <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
+                            <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 flex justify-between items-center">
                                 <div>
-                                    <span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded uppercase tracking-wider">${data.jenisSetoran || 'Setoran'}</span>
-                                    <span class="font-bold text-xs text-primary-brown block mt-1"><i class="fa-solid fa-book-quran text-amber-700 mr-1"></i> ${data.surat}</span>
-                                    <span class="text-[11px] text-gray-600 block">Ayat: ${data.ayat}</span>
+                                    <span class="text-[10px] bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded uppercase tracking-wider">${data.jenisSetoran || 'Absensi Tahfidz'}</span>
+                                    ${infoSetoran}
                                     <span class="text-[9px] text-gray-400">${data.waktuUpdate}</span>
                                 </div>
-                                <span class="text-xs ${badgeKetClass} font-bold px-2.5 py-1 rounded">${ketStatus}</span>
+                                <span class="text-xs ${badgeKetClass} font-bold px-2.5 py-1 rounded">${statusKet}</span>
                             </div>
                         `;
                     } else if (data.kategori === "sunnah") {
+                        const namaAmalanTerpilih = data.amalan || data.kegiatan || "Amalan Sunnah";
+                        const statusKet = isUdzurItem ? ketStatus : "Dikerjakan";
+
                         htmlSunnah += `
                             <div class="p-3 bg-soft-cream rounded-xl border border-[#E3D5C9] flex justify-between items-center">
-                                <span class="text-xs font-medium text-gray-700"><i class="fa-solid fa-star text-amber-500 mr-1.5"></i> ${data.amalan}</span>
-                                <span class="text-[10px] ${badgeKetClass} font-bold px-2.5 py-1 rounded-lg">${ketStatus}</span>
+                                <span class="text-xs font-bold text-primary-brown"><i class="fa-solid fa-star text-amber-500 mr-1.5"></i> ${namaAmalanTerpilih}</span>
+                                <span class="text-[10px] ${badgeKetClass} font-bold px-2.5 py-1 rounded-lg">${statusKet}</span>
                             </div>
                         `;
                     } else if (data.kategori === "sholat") {
@@ -509,7 +532,7 @@
                 if (statsZiyadahEl) statsZiyadahEl.innerText = countZiyadah + " Kali Setoran";
                 if (statsMurojaahEl) statsMurojaahEl.innerText = countMurojaah + " Kali Pengulangan";
 
-                containerTahfidz.innerHTML = htmlTahfidz || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada setoran tahfidz pada periode ini -</div>`;
+                containerTahfidz.innerHTML = htmlTahfidz || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada absensi / setoran tahfidz pada periode ini -</div>`;
                 containerAmalanSunnah.innerHTML = htmlSunnah || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada catatan amalan sunnah pada periode ini -</div>`;
                 if (containerSholatWajib) containerSholatWajib.innerHTML = htmlSholatWajib || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada riwayat sholat wajib pada periode ini -</div>`;
                 containerAgenda.innerHTML = htmlAgenda || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada agenda khusus pada periode ini -</div>`;
@@ -632,7 +655,7 @@
                 <div onclick="bukaModalKehadiranKelas()" class="bg-white p-4 rounded-xl border border-cream shadow-sm cursor-pointer hover:border-primary-brown transition-all">
                     <div class="text-amber-600 text-sm font-semibold mb-1"><i class="fa-solid fa-school-flag"></i> Kehadiran <i class="fa-solid fa-arrow-up-right-from-square text-[10px] ml-1"></i></div>
                     <div id="persentase-kehadiran-val" class="text-lg font-bold text-[#2D2424]">98.5%</div>
-                    <p class="text-[10px] text-gray-500 mt-1">Rata-rata harian</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Rata-rata kelas aktif</p>
                 </div>
 
                 <div class="bg-white p-4 rounded-xl border border-cream shadow-sm">
@@ -783,7 +806,7 @@
                     </div>
                     <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                         <span id="det-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                            Hadir
+                            Aktif
                         </span>
                     </div>
                 </div>
@@ -844,7 +867,7 @@
 
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center gap-2">
-                        <i class="fa-solid fa-book-open-reader"></i> Setoran Tahfidz (Ziyadah / Murojaah / Imtihan)
+                        <i class="fa-solid fa-book-open-reader"></i> Absensi & Setoran Tahfidz (Hadir / Setor / Uzur)
                     </h4>
                     <div id="container-tahfidz-santri" class="space-y-2"></div>
                 </div>
@@ -910,7 +933,7 @@
                 <!-- TIPE 2: SCAN BIASA / INTERAKTIF -->
                 <div id="container-scan-biasa" class="space-y-4 hidden text-center">
                     <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-left text-xs text-blue-900">
-                        <i class="fa-solid fa-circle-info mr-1"></i> <b>Scan Biasa (Interaktif):</b> Pilih kegiatan santai (Sholat Dhuha, Qobliyah Dzuhur, Puasa, dll) setelah scan kartu santri.
+                        <i class="fa-solid fa-circle-info mr-1"></i> <b>Scan Biasa (Interaktif):</b> Pilih kegiatan (Tahfidz, Sholat Sunnah, Puasa, dll) setelah scan kartu santri.
                     </div>
 
                     <div class="py-2">
@@ -931,39 +954,26 @@
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Kegiatan Santai / Khusus:</label>
+                            <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Kegiatan / Sesi:</label>
                             <select id="scan-kategori-pilih" onchange="gantiFormScan()" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown font-semibold text-primary-brown">
-                                <option value="sunnah">1. Amalan Sunnah & Puasa (Dhuha, Qobliyah Dzuhur, dll)</option>
-                                <option value="tahfidz">2. Setoran Tahfidz (Ziyadah / Murojaah / Imtihan)</option>
+                                <option value="tahfidz">1. Absensi & Setoran Tahfidz (Hadir / Hafalan)</option>
+                                <option value="sunnah">2. Amalan Sunnah & Puasa (Dhuha, Qobliyah, dll)</option>
                                 <option value="agenda">3. Kegiatan Khusus (Muhadhoroh, Al-Kahfi, Dzikir)</option>
                             </select>
                         </div>
 
-                        <div id="subform-sunnah" class="space-y-2">
-                            <label class="block text-[11px] font-bold text-primary-brown mb-1">Pilih Amalan Sunnah / Puasa</label>
-                            <select id="scan-sunnah-jenis" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
-                                <option value="Sholat Dhuha">Sholat Dhuha</option>
-                                <option value="Sholat Qobliyah Dzuhur">Sholat Qobliyah Dzuhur</option>
-                                <option value="Puasa Senin-Kamis">Puasa Senin-Kamis</option>
-                                <option value="Puasa Daud">Puasa Daud</option>
-                                <option value="Qobliyah Subuh">Qobliyah Subuh</option>
-                                <option value="Ba'diyah Dzuhur">Ba'diyah Dzuhur</option>
-                                <option value="Ba'diyah Maghrib">Ba'diyah Maghrib</option>
-                                <option value="Ba'diyah Isya">Ba'diyah Isya</option>
-                            </select>
-                        </div>
-
-                        <div id="subform-tahfidz" class="space-y-3 hidden">
+                        <div id="subform-tahfidz" class="space-y-3">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <div>
-                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Jenis Setoran</label>
+                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Status Kehadiran / Jenis</label>
                                     <select id="scan-tahfidz-jenis" onchange="gantiJenisTahfidz()" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
-                                        <option value="Ziyadah (Hafalan Baru)">Ziyadah (Hafalan Baru)</option>
-                                        <option value="Murojaah (Pengulangan)">Murojaah (Pengulangan)</option>
+                                        <option value="Hadir / Absen Tahfidz">Hadir Saja (Hanya Absen Kehadiran)</option>
+                                        <option value="Ziyadah (Hafalan Baru)">Ziyadah (Setor Hafalan Baru)</option>
+                                        <option value="Murojaah (Pengulangan)">Murojaah (Setor Pengulangan)</option>
                                         <option value="Imtihan (Ujian / Tasmi')">Imtihan (Ujian / Tasmi')</option>
                                     </select>
                                 </div>
-                                <div>
+                                <div id="div-kelancaran-tahfidz">
                                     <label class="block text-[11px] font-bold text-primary-brown mb-1">Kelancaran</label>
                                     <select id="scan-tahfidz-status" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                                         <option value="Lancar (Mumtaz)">Lancar (Mumtaz)</option>
@@ -973,7 +983,7 @@
                                 </div>
                             </div>
 
-                            <div id="tahfidz-ziyadah-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div id="tahfidz-ziyadah-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-2 hidden">
                                 <div>
                                     <label class="block text-[11px] font-bold text-primary-brown mb-1">Nama Surat / Juz</label>
                                     <input type="text" id="scan-tahfidz-surat" placeholder="Contoh: An-Naba" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
@@ -1000,6 +1010,20 @@
                                     <input type="text" id="scan-murojaah-ayat" placeholder="Selesai / Ayat 1-40" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                                 </div>
                             </div>
+                        </div>
+
+                        <div id="subform-sunnah" class="space-y-2 hidden">
+                            <label class="block text-[11px] font-bold text-primary-brown mb-1">Pilih Amalan Sunnah / Puasa</label>
+                            <select id="scan-sunnah-jenis" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                <option value="Sholat Dhuha">Sholat Dhuha</option>
+                                <option value="Sholat Qobliyah Dzuhur">Sholat Qobliyah Dzuhur</option>
+                                <option value="Sholat Ba'diyah Dzuhur">Sholat Ba'diyah Dzuhur</option>
+                                <option value="Puasa Senin-Kamis">Puasa Senin-Kamis</option>
+                                <option value="Puasa Daud">Puasa Daud</option>
+                                <option value="Qobliyah Subuh">Qobliyah Subuh</option>
+                                <option value="Ba'diyah Maghrib">Ba'diyah Maghrib</option>
+                                <option value="Ba'diyah Isya">Ba'diyah Isya</option>
+                            </select>
                         </div>
 
                         <div id="subform-agenda" class="space-y-2 hidden">
@@ -1068,7 +1092,7 @@
                         <h3 class="font-bold text-base text-primary-brown flex items-center gap-2">
                             <i class="fa-solid fa-bullhorn"></i> Panel Musrif: Sesi Scan Cepat, Koreksi Uzur & Hapus Catatan
                         </h3>
-                        <p class="text-xs text-gray-600 mt-0.5">Atur sesi scan cepat, ubah status kegiatan menjadi Udzur (kamar mandi), atau hapus catatan.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">Atur sesi scan cepat, ubah status kegiatan termasuk Tahfidz menjadi Udzur, atau hapus catatan.</p>
                     </div>
                     <button onclick="lockPanel()" class="text-[10px] bg-rose-100 text-rose-800 font-bold px-2.5 py-1.5 rounded-lg hover:bg-rose-200">
                         <i class="fa-solid fa-lock mr-1"></i> Keluar
@@ -1078,8 +1102,12 @@
                 <div class="space-y-3 bg-soft-cream p-4 rounded-xl border border-[#E3D5C9]">
                     <h4 class="font-bold text-xs text-primary-brown"><i class="fa-solid fa-gear mr-1"></i> Seting Sesi Aktif untuk Menu 'Scan Cepat'</h4>
                     <div>
-                        <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Sholat & Kajian</label>
+                        <label class="block text-xs font-bold text-primary-brown mb-1">Pilih Sholat, Tahfidz & Kajian</label>
                         <select id="setting-sesi-kegiatan" class="w-full text-xs px-3 py-2.5 rounded-xl border border-cream bg-white focus:outline-none focus:border-primary-brown font-bold text-primary-brown">
+                            <optgroup label="Sesi Absensi Tahfidz">
+                                <option value="Absensi Tahfidz Pagi">Absensi Tahfidz Pagi</option>
+                                <option value="Absensi Tahfidz Sore">Absensi Tahfidz Sore</option>
+                            </optgroup>
                             <optgroup label="Sholat Wajib Berjamaah">
                                 <option value="Absen Sholat Subuh Berjamaah">Absen Sholat Subuh Berjamaah</option>
                                 <option value="Absen Sholat Dzuhur Berjamaah">Absen Sholat Dzuhur Berjamaah</option>
@@ -1090,8 +1118,8 @@
                             <optgroup label="Sholat Sunnah & Kajian Cepat">
                                 <option value="Sholat Dhuha">Sholat Dhuha</option>
                                 <option value="Sholat Qobliyah Dzuhur">Sholat Qobliyah Dzuhur</option>
+                                <option value="Sholat Ba'diyah Dzuhur">Sholat Ba'diyah Dzuhur</option>
                                 <option value="Qobliyah Subuh">Qobliyah Subuh</option>
-                                <option value="Ba'diyah Dzuhur">Ba'diyah Dzuhur</option>
                                 <option value="Ba'diyah Maghrib">Ba'diyah Maghrib</option>
                                 <option value="Ba'diyah Isya">Ba'diyah Isya</option>
                                 <option value="Kajian Sore">Kajian Sore</option>
@@ -1105,13 +1133,13 @@
                     <p class="text-[10px] text-gray-500 text-center">Status Sesi Cepat Aktif: <b id="text-status-sesi-aktif" class="text-emerald-700">-</b></p>
                 </div>
 
-                <!-- FITUR KOREKSI UZDUR / IZIN KAMAR MANDI PADA CATATAN KEGIATAN -->
+                <!-- FITUR KOREKSI UZDUR / IZIN PADA CATATAN KEGIATAN & TAHFIDZ -->
                 <div class="space-y-3 bg-purple-50 p-4 rounded-xl border border-purple-200">
                     <div class="flex justify-between items-center">
-                        <h4 class="font-bold text-xs text-purple-950"><i class="fa-solid fa-person-walking-arrow-right mr-1"></i> Koreksi Uzur Kegiatan / Izin (Kamar Mandi) & Hapus Catatan</h4>
+                        <h4 class="font-bold text-xs text-purple-950"><i class="fa-solid fa-person-walking-arrow-right mr-1"></i> Koreksi Uzur Kegiatan / Tahfidz / Izin & Hapus Catatan</h4>
                         <input type="text" id="search-hapus-kegiatan" onkeyup="filterHapusKegiatan()" placeholder="Cari santri/kegiatan..." class="text-xs px-3 py-1.5 rounded-lg border border-purple-300 bg-white focus:outline-none w-44">
                     </div>
-                    <p class="text-[11px] text-purple-900">Jika santri izin ke kamar mandi atau berhalangan pada kegiatan/sholat tertentu, klik tombol <b>Set Udzur</b> pada riwayat catatannya di bawah ini agar terlihat jelas pada kegiatan tersebut.</p>
+                    <p class="text-[11px] text-purple-900">Jika santri izin atau berhalangan hadir pada sesi tahfidz, sholat, atau amalan lainnya, klik tombol <b>Set Udzur</b> pada riwayat catatannya di bawah ini.</p>
                     <div id="list-hapus-kegiatan-container" class="space-y-2 max-h-56 overflow-y-auto"></div>
                 </div>
 
@@ -1531,8 +1559,8 @@
             if (window.cacheDataSantri && window.cacheDataSantri.length > 0) {
                 let html = "";
                 window.cacheDataSantri.forEach((s, idx) => {
-                    let ket = s.keteranganAbsen || 'Hadir';
-                    let badgeBg = ket === 'Hadir' ? 'bg-emerald-100 text-emerald-800' : (ket === 'Sakit' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800');
+                    let ket = s.keteranganAbsen || 'Aktif';
+                    let badgeBg = ket === 'Aktif' ? 'bg-emerald-100 text-emerald-800' : (ket === 'Sakit' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800');
                     html += `
                         <div class="p-3 bg-soft-cream rounded-xl border border-cream flex justify-between items-center text-xs">
                             <div>
@@ -1560,20 +1588,15 @@
 
             if (window.globalStatistikKelas && Object.keys(window.globalStatistikKelas).length > 0) {
                 let html = "";
-                let totalSemuaSantri = window.globalTotalSantriCount || 1;
-                let baseTotalPersen = 98.5;
-
                 for (const [kelas, data] of Object.entries(window.globalStatistikKelas)) {
-                    let proporsiKelas = (data.total / totalSemuaSantri) * baseTotalPersen;
-                    let persenTampil = proporsiKelas > baseTotalPersen ? baseTotalPersen : proporsiKelas.toFixed(1);
-
+                    let rasioAktif = data.total > 0 ? (data.aktif / data.total) * 100 : 0;
                     html += `
                         <div class="p-3 bg-soft-cream rounded-xl border border-cream flex justify-between items-center text-xs">
                             <div>
                                 <span class="font-bold text-primary-brown block"><i class="fa-solid fa-graduation-cap text-amber-600 mr-1"></i> Kelas ${kelas}</span>
-                                <span class="text-[10px] text-gray-500">Jumlah Santri: ${data.total} Orang</span>
+                                <span class="text-[10px] text-gray-500">Santri Aktif: ${data.aktif} dari ${data.total} Orang</span>
                             </div>
-                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg font-bold text-xs">${persenTampil}% (Proporsional)</span>
+                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg font-bold text-xs">${rasioAktif.toFixed(1)}% (Maks 100%)</span>
                         </div>
                     `;
                 }
@@ -1718,7 +1741,7 @@
         }
 
         function muatSesiAktifMusrifUI() {
-            const sesi = localStorage.getItem('sesi_aktif_pesantren') || "Absen Sholat Subuh Berjamaah";
+            const sesi = localStorage.getItem('sesi_aktif_pesantren') || "Absensi Tahfidz Pagi";
             const el = document.getElementById('text-status-sesi-aktif');
             if (el) el.innerText = sesi;
             const selectEl = document.getElementById('setting-sesi-kegiatan');
@@ -1726,7 +1749,7 @@
         }
 
         function muatSesiAktifScan() {
-            const sesi = localStorage.getItem('sesi_aktif_pesantren') || "Absen Sholat Subuh Berjamaah";
+            const sesi = localStorage.getItem('sesi_aktif_pesantren') || "Absensi Tahfidz Pagi";
             const el = document.getElementById('label-sesi-aktif');
             if (el) el.innerText = sesi;
         }
@@ -1818,8 +1841,8 @@
 
         function gantiFormScan() {
             const kat = document.getElementById('scan-kategori-pilih').value;
-            document.getElementById('subform-sunnah').classList.add('hidden');
             document.getElementById('subform-tahfidz').classList.add('hidden');
+            document.getElementById('subform-sunnah').classList.add('hidden');
             document.getElementById('subform-agenda').classList.add('hidden');
             document.getElementById('subform-' + kat).classList.remove('hidden');
         }
@@ -1828,13 +1851,21 @@
             const jenis = document.getElementById('scan-tahfidz-jenis').value;
             const fieldZiyadah = document.getElementById('tahfidz-ziyadah-fields');
             const fieldMurojaah = document.getElementById('tahfidz-murojaah-fields');
+            const divKelancaran = document.getElementById('div-kelancaran-tahfidz');
 
-            if (jenis.includes('Ziyadah')) {
-                fieldZiyadah.classList.remove('hidden');
-                fieldMurojaah.classList.add('hidden');
-            } else {
+            if (jenis.includes('Hadir')) {
                 fieldZiyadah.classList.add('hidden');
-                fieldMurojaah.classList.remove('hidden');
+                fieldMurojaah.classList.add('hidden');
+                divKelancaran.classList.add('hidden');
+            } else {
+                divKelancaran.classList.remove('hidden');
+                if (jenis.includes('Ziyadah')) {
+                    fieldZiyadah.classList.remove('hidden');
+                    fieldMurojaah.classList.add('hidden');
+                } else {
+                    fieldZiyadah.classList.add('hidden');
+                    fieldMurojaah.classList.remove('hidden');
+                }
             }
         }
 
@@ -1889,40 +1920,47 @@
             const kat = document.getElementById('scan-kategori-pilih').value;
             let payload = { namaSantri: currentScannedSantriNormal };
 
-            if (kat === 'sunnah') {
+            if (kat === 'tahfidz') {
+                const jenisSetoran = document.getElementById('scan-tahfidz-jenis').value;
+                payload.kategori = "tahfidz";
+                payload.jenisSetoran = jenisSetoran;
+
+                if (jenisSetoran.includes('Hadir')) {
+                    payload.status = "Hadir / Hadir Tahfidz";
+                    payload.surat = "";
+                    payload.ayat = "";
+                } else {
+                    const status = document.getElementById('scan-tahfidz-status').value;
+                    payload.status = status;
+
+                    if (jenisSetoran.includes('Ziyadah')) {
+                        const surat = document.getElementById('scan-tahfidz-surat').value.trim();
+                        const ayat = document.getElementById('scan-tahfidz-ayat').value.trim();
+                        if (!surat) {
+                            alert("Mohon isi Nama Surat / Juz terlebih dahulu!");
+                            return;
+                        }
+                        payload.surat = surat;
+                        payload.ayat = ayat || "-";
+                    } else {
+                        const dariSurat = document.getElementById('scan-murojaah-dari').value.trim();
+                        const sampaiSurat = document.getElementById('scan-murojaah-sampai').value.trim();
+                        const ayatMurojaah = document.getElementById('scan-murojaah-ayat').value.trim();
+                        if (!dariSurat || !sampaiSurat) {
+                            alert("Mohon isi rentang Surat Awal dan Surat Akhir terlebih dahulu!");
+                            return;
+                        }
+                        payload.surat = `Dari Surat ${dariSurat} s/d ${sampaiSurat}`;
+                        payload.ayat = ayatMurojaah || "Selesai";
+                    }
+                }
+            }
+            else if (kat === 'sunnah') {
                 const jenisAmalan = document.getElementById('scan-sunnah-jenis').value;
                 payload.kategori = "sunnah";
                 payload.amalan = jenisAmalan;
-                payload.keterangan = "Rutin Dikerjakan";
-            } 
-            else if (kat === 'tahfidz') {
-                const jenisSetoran = document.getElementById('scan-tahfidz-jenis').value;
-                const status = document.getElementById('scan-tahfidz-status').value;
-
-                payload.kategori = "tahfidz";
-                payload.jenisSetoran = jenisSetoran;
-                payload.status = status;
-
-                if (jenisSetoran.includes('Ziyadah')) {
-                    const surat = document.getElementById('scan-tahfidz-surat').value.trim();
-                    const ayat = document.getElementById('scan-tahfidz-ayat').value.trim();
-                    if (!surat) {
-                        alert("Mohon isi Nama Surat / Juz terlebih dahulu!");
-                        return;
-                    }
-                    payload.surat = surat;
-                    payload.ayat = ayat || "-";
-                } else {
-                    const dariSurat = document.getElementById('scan-murojaah-dari').value.trim();
-                    const sampaiSurat = document.getElementById('scan-murojaah-sampai').value.trim();
-                    const ayatMurojaah = document.getElementById('scan-murojaah-ayat').value.trim();
-                    if (!dariSurat || !sampaiSurat) {
-                        alert("Mohon isi rentang Surat Awal dan Surat Akhir terlebih dahulu!");
-                        return;
-                    }
-                    payload.surat = `Dari Surat ${dariSurat} s/d ${sampaiSurat}`;
-                    payload.ayat = ayatMurojaah || "Selesai";
-                }
+                payload.kegiatan = jenisAmalan;
+                payload.keterangan = "Dikerjakan";
             } 
             else if (kat === 'agenda') {
                 const kegiatan = document.getElementById('scan-agenda-jenis').value;
@@ -1959,10 +1997,12 @@
                     if (isProcessingScan) return;
                     isProcessingScan = true;
 
-                    const sesiAktif = localStorage.getItem('sesi_aktif_pesantren') || "Absen Sholat Subuh Berjamaah";
+                    const sesiAktif = localStorage.getItem('sesi_aktif_pesantren') || "Absensi Tahfidz Pagi";
                     
                     let kategoriTipe = "agenda";
-                    if (sesiAktif.includes("Sholat") && !sesiAktif.includes("Dhuha") && !sesiAktif.includes("Qobliyah")) {
+                    if (sesiAktif.includes("Tahfidz")) {
+                        kategoriTipe = "tahfidz";
+                    } else if (sesiAktif.includes("Sholat") && !sesiAktif.includes("Dhuha") && !sesiAktif.includes("Qobliyah") && !sesiAktif.includes("Ba'diyah")) {
                         kategoriTipe = "sholat";
                     } else if (sesiAktif.includes("Dhuha") || sesiAktif.includes("Qobliyah") || sesiAktif.includes("Ba'diyah")) {
                         kategoriTipe = "sunnah";
@@ -1972,7 +2012,10 @@
                         namaSantri: decodedText,
                         kategori: kategoriTipe,
                         kegiatan: sesiAktif,
-                        catatan: "Hadir / Selesai (Scan Cepat)"
+                        amalan: sesiAktif,
+                        jenisSetoran: sesiAktif.includes("Tahfidz") ? sesiAktif : undefined,
+                        catatan: "Dikerjakan",
+                        status: "Hadir / Dikerjakan"
                     };
 
                     const alertBox = document.getElementById('fast-scan-alert');
