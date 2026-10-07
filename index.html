@@ -18,7 +18,7 @@
     <!-- Firebase SDK (Modular) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBay7zJ_G-qztsStW7PtjZMRVSPOowrvPw",
@@ -218,24 +218,6 @@
                 const todayDateStr = new Date().toLocaleDateString('id-ID');
                 const infoUnikCek = dataObjek.amalan || dataObjek.kegiatan || dataObjek.jenisSetoran || "Kegiatan";
                 
-                const qCek = query(
-                    collection(db, "catatan_musrif"), 
-                    where("namaSantri", "==", dataObjek.namaSantri)
-                );
-                const snapCek = await getDocs(qCek);
-                
-                let sudahAbsenHariIni = false;
-                snapCek.forEach((docSnap) => {
-                    const existingData = docSnap.data();
-                    if (existingData.tanggalStr === todayDateStr && existingData.kegiatan === infoUnikCek) {
-                        sudahAbsenHariIni = true;
-                    }
-                });
-                
-                if (sudahAbsenHariIni) {
-                    return { status: "sudah_absen", pesan: `ANDA TELAH ABSEN<br><span class="text-xs font-normal">${dataObjek.namaSantri} sudah diabsen untuk kegiatan "${infoUnikCek}" hari ini.</span>` };
-                }
-
                 await addDoc(collection(db, "catatan_musrif"), {
                     ...dataObjek,
                     kegiatan: infoUnikCek,
@@ -251,13 +233,15 @@
             }
         };
 
+        // Dioptimalkan: Menggunakan limit(50) agar tidak membaca seluruh riwayat historis
         window.muatDataHapusMusrif = async function() {
             const container = document.getElementById('list-hapus-kegiatan-container');
             if (!container) return;
             container.innerHTML = `<p class="text-xs text-gray-400 text-center py-2">Memuat daftar riwayat kegiatan...</p>`;
 
             try {
-                const querySnapshot = await getDocs(collection(db, "catatan_musrif"));
+                const qMusrif = query(collection(db, "catatan_musrif"), orderBy("timestamp", "desc"), limit(50));
+                const querySnapshot = await getDocs(qMusrif);
                 let html = "";
                 querySnapshot.forEach((docSnap) => {
                     const data = docSnap.data();
@@ -373,6 +357,7 @@
             }
         };
 
+        // Dioptimalkan: Menggunakan limit(50) agar tidak membaca seluruh arsip keuangan sekaligus
         window.muatDataKeuanganUntukUpdate = async function() {
             const container = document.getElementById('list-update-keuangan-container');
             const filterTahunEl = document.getElementById('filter-tahun-bendahara');
@@ -382,7 +367,8 @@
             container.innerHTML = `<p class="text-xs text-gray-400 text-center py-2">Memuat data keuangan...</p>`;
 
             try {
-                const querySnapshot = await getDocs(collection(db, "catatan_keuangan_detail"));
+                const qKeuangan = query(collection(db, "catatan_keuangan_detail"), orderBy("timestamp", "desc"), limit(50));
+                const querySnapshot = await getDocs(qKeuangan);
                 let html = "";
                 window.cacheDataKeuangan = [];
                 const daftarNamaAktif = window.cacheDataSantri.map(s => s.nama.toLowerCase());
@@ -459,14 +445,17 @@
             }
         };
 
+        // Fungsi Memuat Data Santri dan Menampilkan Riwayat Ziyadah, Murojaah, Tasmi' Terakhir serta Filter Waktu Klik
         window.muatDataSantriDariCloud = async function(namaSantri, rentangWaktu = 'harian') {
             const containerTahfidz = document.getElementById('container-tahfidz-santri');
             const containerAmalanSunnah = document.getElementById('container-amalan-sunnah');
             const containerSholatWajib = document.getElementById('container-sholat-wajib-santri');
             const containerAgenda = document.getElementById('container-agenda-santri');
             const containerKeuangan = document.getElementById('container-keuangan-santri');
-            const statsZiyadahEl = document.getElementById('stats-ziyadah-val');
-            const statsMurojaahEl = document.getElementById('stats-murojaah-val');
+            
+            const detZiyadahTerakhir = document.getElementById('det-ziyadah-terakhir');
+            const detMurojaahTerakhir = document.getElementById('det-murojaah-terakhir');
+            const detTasmiTerakhir = document.getElementById('det-tasmi-terakhir');
             
             if (!containerTahfidz) return;
 
@@ -502,16 +491,25 @@
                 let htmlSholatWajib = "";
                 let htmlAgenda = "";
                 
-                let countZiyadah = 0;
-                let countMurojaah = 0;
+                let dataZiyadahTerakhir = null;
+                let dataMurojaahTerakhir = null;
+                let dataTasmiTerakhir = null;
 
-                window.cacheRawMusrif.forEach((data) => {
+                const sortedDataMusrif = [...window.cacheRawMusrif].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+                sortedDataMusrif.forEach((data) => {
                     const itemTimestamp = data.timestamp || 0;
                     const selisihWaktu = nowTime - itemTimestamp;
 
                     if (data.kategori === "tahfidz") {
-                        if ((data.jenisSetoran || "").includes("Ziyadah")) countZiyadah++;
-                        if ((data.jenisSetoran || "").includes("Murojaah") || (data.jenisSetoran || "").includes("Imtihan")) countMurojaah++;
+                        const jenisSetoranStr = (data.jenisSetoran || "").toLowerCase();
+                        if (jenisSetoranStr.includes("ziyadah") && !dataZiyadahTerakhir) {
+                            dataZiyadahTerakhir = data;
+                        } else if (jenisSetoranStr.includes("murojaah") && !dataMurojaahTerakhir) {
+                            dataMurojaahTerakhir = data;
+                        } else if ((jenisSetoranStr.includes("imtihan") || jenisSetoranStr.includes("tasmi")) && !dataTasmiTerakhir) {
+                            dataTasmiTerakhir = data;
+                        }
                     }
 
                     if (rentangWaktu === 'harian') {
@@ -528,7 +526,14 @@
 
                     if (data.kategori === "tahfidz") {
                         const sesiJudul = data.sesiTahfidz || data.jenisSetoran || "Absensi Tahfidz";
-                        const infoSetoran = data.surat ? `<span class="font-bold text-xs text-primary-brown block mt-1"><i class="fa-solid fa-book-quran text-amber-700 mr-1"></i> ${data.surat} (Ayat: ${data.ayat})</span>` : `<span class="text-[11px] text-gray-600 block mt-0.5">Absensi Kehadiran</span>`;
+                        let infoSetoran = "";
+                        if (data.jenisSetoran && data.jenisSetoran.toLowerCase().includes("tasmi")) {
+                            infoSetoran = `<span class="font-bold text-xs text-primary-brown block mt-1 cursor-pointer hover:underline text-indigo-700" onclick='bukaDetailTasmiModal(${JSON.stringify(data)})'><i class="fa-solid fa-award mr-1"></i> Ujian Tasmi': ${data.surat} (Klik untuk detail nilai & salah)</span>`;
+                        } else if (data.surat) {
+                            infoSetoran = `<span class="font-bold text-xs text-primary-brown block mt-1"><i class="fa-solid fa-book-quran text-amber-700 mr-1"></i> ${data.surat} (Ayat: ${data.ayat})</span>`;
+                        } else {
+                            infoSetoran = `<span class="text-[11px] text-gray-600 block mt-0.5">Absensi Kehadiran</span>`;
+                        }
                         const statusKet = isUdzurItem ? ketStatus : (data.status || "Hadir");
 
                         htmlTahfidz += `
@@ -575,14 +580,53 @@
                     }
                 });
 
-                if (statsZiyadahEl) statsZiyadahEl.innerText = countZiyadah + " Kali Setoran";
-                if (statsMurojaahEl) statsMurojaahEl.innerText = countMurojaah + " Kali Pengulangan / Imtihan";
+                // Render Ziyadah Terakhir
+                if (detZiyadahTerakhir) {
+                    if (dataZiyadahTerakhir) {
+                        detZiyadahTerakhir.innerHTML = `
+                            <span class="font-bold text-primary-brown block"><i class="fa-solid fa-bookmark text-amber-600 mr-1"></i> ${dataZiyadahTerakhir.surat || '-'}</span>
+                            <span class="text-[11px] text-gray-600 block">Ayat: ${dataZiyadahTerakhir.ayat || '-'} • (${dataZiyadahTerakhir.status || 'Lancar'})</span>
+                            <span class="text-[9px] text-gray-400 block mt-0.5">${dataZiyadahTerakhir.waktuUpdate || dataZiyadahTerakhir.tanggalStr || ''}</span>
+                        `;
+                    } else {
+                        detZiyadahTerakhir.innerHTML = `<span class="text-gray-400 italic">Belum ada riwayat ziyadah</span>`;
+                    }
+                }
+
+                // Render Murojaah Terakhir
+                if (detMurojaahTerakhir) {
+                    if (dataMurojaahTerakhir) {
+                        detMurojaahTerakhir.innerHTML = `
+                            <span class="font-bold text-primary-brown block"><i class="fa-solid fa-bookmark text-blue-600 mr-1"></i> ${dataMurojaahTerakhir.surat || '-'}</span>
+                            <span class="text-[11px] text-gray-600 block">Keterangan: ${dataMurojaahTerakhir.ayat || '-'} • (${dataMurojaahTerakhir.status || 'Lancar'})</span>
+                            <span class="text-[9px] text-gray-400 block mt-0.5">${dataMurojaahTerakhir.waktuUpdate || dataMurojaahTerakhir.tanggalStr || ''}</span>
+                        `;
+                    } else {
+                        detMurojaahTerakhir.innerHTML = `<span class="text-gray-400 italic">Belum ada riwayat murojaah</span>`;
+                    }
+                }
+
+                // Render Ujian Tasmi' Terakhir
+                if (detTasmiTerakhir) {
+                    if (dataTasmiTerakhir) {
+                        detTasmiTerakhir.innerHTML = `
+                            <span class="font-bold text-indigo-900 block cursor-pointer hover:underline" onclick='bukaDetailTasmiModal(${JSON.stringify(dataTasmiTerakhir)})'>
+                                <i class="fa-solid fa-award text-indigo-700 mr-1"></i> ${dataTasmiTerakhir.surat || '-'} (Klik Detail)
+                            </span>
+                            <span class="text-[11px] text-gray-600 block">Nilai: <b>${dataTasmiTerakhir.nilaiTasmi || '-'}</b> • Kelancaran: ${dataTasmiTerakhir.status || '-'}</span>
+                            <span class="text-[9px] text-gray-400 block mt-0.5">${dataTasmiTerakhir.waktuUpdate || dataTasmiTerakhir.tanggalStr || ''}</span>
+                        `;
+                    } else {
+                        detTasmiTerakhir.innerHTML = `<span class="text-gray-400 italic">Belum ada riwayat ujian tasmi'</span>`;
+                    }
+                }
 
                 containerTahfidz.innerHTML = htmlTahfidz || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada absensi / setoran tahfidz pada periode ini -</div>`;
                 containerAmalanSunnah.innerHTML = htmlSunnah || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada catatan amalan sunnah pada periode ini -</div>`;
                 if (containerSholatWajib) containerSholatWajib.innerHTML = htmlSholatWajib || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada riwayat sholat wajib pada periode ini -</div>`;
                 containerAgenda.innerHTML = htmlAgenda || `<div class="p-3 bg-soft-cream rounded-xl text-center text-xs text-gray-500">- Tidak ada agenda khusus pada periode ini -</div>`;
 
+                // Dioptimalkan: Menggunakan where query spesifik untuk nama santri alih-alih membaca semua data keuangan
                 const qKeuangan = query(collection(db, "catatan_keuangan_detail"), where("namaSantri", "==", namaSantri));
                 const snapshotKeuangan = await getDocs(qKeuangan);
 
@@ -742,7 +786,7 @@
                         <span class="font-bold text-xs text-primary-brown block"><i class="fa-solid fa-clipboard-list text-amber-700 mr-1"></i> Program & Target Utama</span>
                         <ul class="text-xs text-gray-700 space-y-1 pl-4 list-disc">
                             <li>Bahasa Arab Aktif (Baca, Tulis, Bicara)</li>
-                            <li>Tahfidz Al-Qur'an (Target 10 Juz dalam 3 Tahun) & Hadits</li>
+                            <li>Tahfidz Al-Qur'an (Target 10 Juz dalam 3 Tahun) & Ujian Tasmi' Berkala</li>
                             <li>Hafalan Matan Kitab & Pemahaman Isinya</li>
                             <li>Kemandirian, Bersosialisasi & Berakhlak Mulia</li>
                         </ul>
@@ -786,14 +830,14 @@
                             <i class="fa-solid fa-book-open text-primary-brown text-lg mb-1"></i>
                             <span class="block font-bold text-[11px]">Gedung Tahfidz</span>
                         </div>
-                        <!-- Tombol Visi Misi Interaktif (Ikon Masjid) -->
+                        <!-- Tombol Visi Misi Interaktif -->
                         <div onclick="toggleVisiMisi()" class="p-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-center border border-emerald-800 cursor-pointer transition-all shadow-sm flex flex-col justify-center items-center">
                             <i class="fa-solid fa-mosque text-lg mb-1"></i>
                             <span class="block font-bold text-[11px] leading-tight">Visi & Misi (Klik)</span>
                         </div>
                     </div>
 
-                    <!-- KONTEN VISI & MISI (TERSEMBUNYI HINGGA DIKLIK) -->
+                    <!-- KONTEN VISI & MISI -->
                     <div id="box-visi-misi" class="space-y-4 pt-2 hidden transition-all">
                         <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-2">
                             <h4 class="font-bold text-emerald-950 text-sm flex items-center gap-1.5">
@@ -814,20 +858,6 @@
                                 <li>Mendidik santri agar cinta kepada Sunnah Rasulullah ﷺ, menghafalkannya, dan mengamalkannya.</li>
                                 <li>Membentuk santri pribadi yang mandiri, bermanfaat untuk orang lain, dan berakhlak mulia.</li>
                                 <li>Membekali santri dengan ilmu pengetahuan yang cukup untuk menghadapi kehidupan yang nyata.</li>
-                            </ol>
-                        </div>
-
-                        <!-- TARGET & PROGRAM PEMBELAJARAN SANTRI -->
-                        <div class="p-4 bg-blue-50 rounded-xl border border-blue-200 space-y-2">
-                            <h4 class="font-bold text-blue-950 text-sm flex items-center gap-1.5">
-                                <i class="fa-solid fa-graduation-cap text-blue-700"></i> Target & Program Pembelajaran Santri:
-                            </h4>
-                            <ol class="space-y-1.5 pl-4 list-decimal text-blue-950">
-                                <li>Santri mampu membaca, menulis, serta berbicara Bahasa Arab secara aktif.</li>
-                                <li>Santri mampu menghafal Al-Qur'an dengan target 10 Juz dalam 3 tahun serta menghafal hadits-hadits.</li>
-                                <li>Santri mampu menghafal matan-matan kitab dan memahami isinya.</li>
-                                <li>Santri bisa hidup mandiri dan bersosialisasi dengan masyarakat.</li>
-                                <li>Santri yang memiliki akhlaq mulia.</li>
                             </ol>
                         </div>
                     </div>
@@ -901,41 +931,41 @@
                     </div>
                 </div>
 
-                <!-- KARTU PERKEMBANGAN & PERSENTASE HAFALAN TAHFIDZ -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center font-bold">
-                            <i class="fa-solid fa-book-quran"></i>
+                <!-- KARTU RIWAYAT TERAKHIR ZIYADAH, MUROJAAH & UJIAN TASMI' -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
+                        <div class="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                            <i class="fa-solid fa-book-quran text-amber-700 text-sm"></i> Ziyadah Terakhir
                         </div>
-                        <div>
-                            <span class="text-[10px] uppercase font-bold text-amber-800">Perkembangan Ziyadah (Hafalan Baru)</span>
-                            <div id="stats-ziyadah-val" class="font-bold text-sm text-primary-brown">0 Kali Setoran</div>
-                        </div>
+                        <div id="det-ziyadah-terakhir" class="text-xs text-gray-700 font-medium">Memuat data...</div>
                     </div>
-                    <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-blue-200 text-blue-900 flex items-center justify-center font-bold">
-                            <i class="fa-solid fa-rotate"></i>
+                    <div class="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-1.5">
+                        <div class="flex items-center gap-2 text-blue-900 font-bold text-xs">
+                            <i class="fa-solid fa-rotate text-blue-700 text-sm"></i> Murojaah Terakhir
                         </div>
-                        <div>
-                            <span class="text-[10px] uppercase font-bold text-blue-800">Perkembangan Murojaah & Imtihan</span>
-                            <div id="stats-murojaah-val" class="font-bold text-sm text-primary-brown">0 Kali Pengulangan</div>
+                        <div id="det-murojaah-terakhir" class="text-xs text-gray-700 font-medium">Memuat data...</div>
+                    </div>
+                    <div class="p-4 bg-indigo-50 border border-indigo-200 rounded-xl space-y-1.5">
+                        <div class="flex items-center gap-2 text-indigo-900 font-bold text-xs">
+                            <i class="fa-solid fa-award text-indigo-700 text-sm"></i> Ujian Tasmi' (3 Bulan)
                         </div>
+                        <div id="det-tasmi-terakhir" class="text-xs text-gray-700 font-medium">Memuat data...</div>
                     </div>
                 </div>
 
-                <!-- PILIHAN FILTER WAKTU UNTUK ORANG TUA / WALI -->
+                <!-- PILIHAN FILTER WAKTU (1, 7, 35 HARI YANG LALU) -->
                 <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-2 text-xs">
                     <span class="font-bold text-amber-950"><i class="fa-solid fa-filter mr-1"></i> Filter Riwayat Kegiatan:</span>
                     <div class="flex bg-white p-1 rounded-lg border border-amber-300 w-full sm:w-auto justify-center">
-                        <button onclick="gantiFilterWaktuSantri('harian')" id="btn-filter-harian" class="px-3 py-1 rounded-md font-bold bg-primary-brown text-white text-[11px] transition-all flex-1 sm:flex-initial">Harian</button>
-                        <button onclick="gantiFilterWaktuSantri('mingguan')" id="btn-filter-mingguan" class="px-3 py-1 rounded-md font-bold text-gray-700 text-[11px] transition-all flex-1 sm:flex-initial">Mingguan (7 Hari)</button>
-                        <button onclick="gantiFilterWaktuSantri('bulanan')" id="btn-filter-bulanan" class="px-3 py-1 rounded-md font-bold text-gray-700 text-[11px] transition-all flex-1 sm:flex-initial">Bulanan (35 Hari)</button>
+                        <button onclick="gantiFilterWaktuSantri('harian')" id="btn-filter-harian" class="px-3 py-1 rounded-md font-bold bg-primary-brown text-white text-[11px] transition-all flex-1 sm:flex-initial">Harian (Hari Ini)</button>
+                        <button onclick="gantiFilterWaktuSantri('mingguan')" id="btn-filter-mingguan" class="px-3 py-1 rounded-md font-bold text-gray-700 text-[11px] transition-all flex-1 sm:flex-initial">7 Hari yang Lalu</button>
+                        <button onclick="gantiFilterWaktuSantri('bulanan')" id="btn-filter-bulanan" class="px-3 py-1 rounded-md font-bold text-gray-700 text-[11px] transition-all flex-1 sm:flex-initial">35 Hari yang Lalu</button>
                     </div>
                 </div>
 
                 <div class="space-y-3">
                     <h4 class="font-bold text-sm text-primary-brown flex items-center justify-between">
-                        <span><i class="fa-solid fa-wallet mr-1"></i> Riwayat Keuangan & Pos Kegiatan (Termasuk Belum Terbayar)</span>
+                        <span><i class="fa-solid fa-wallet mr-1"></i> Riwayat Keuangan & Pos Kegiatan</span>
                         <span class="text-[10px] font-normal text-gray-500">Live dari Cloud</span>
                     </h4>
                     <div id="container-keuangan-santri" class="space-y-2"></div>
@@ -986,7 +1016,7 @@
                             <i class="fa-solid fa-bolt mr-1"></i> Scan Cepat Beruntun (Sholat, Sunnah, Kajian, dll)
                         </button>
                         <button onclick="pilihTipeScan('biasa')" id="btn-tipe-biasa" class="px-3 py-1.5 rounded-lg font-bold text-gray-700 hover:text-primary-brown transition-all">
-                            <i class="fa-solid fa-hand-pointer mr-1"></i> Scan Biasa (Khusus Tahfidz & Setoran)
+                            <i class="fa-solid fa-hand-pointer mr-1"></i> Scan Biasa (Tahfidz & Ujian Tasmi')
                         </button>
                     </div>
                 </div>
@@ -1003,7 +1033,6 @@
                         </button>
                     </div>
 
-                    <!-- Kotak Notifikasi Hasil Scan Cepat -->
                     <div id="fast-scan-alert" class="p-5 rounded-2xl border hidden text-center transition-all shadow-md">
                         <p id="fast-scan-msg" class="font-bold text-base"></p>
                     </div>
@@ -1020,10 +1049,10 @@
                     <div id="reader-cepat" class="w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-cream hidden"></div>
                 </div>
 
-                <!-- TIPE 2: SCAN BIASA / INTERAKTIF (KHUSUS TAHFIDZ) -->
+                <!-- TIPE 2: SCAN BIASA / TAHFIDZ & UJIAN TASMI' -->
                 <div id="container-scan-biasa" class="space-y-4 hidden text-center">
                     <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-left text-xs text-blue-900">
-                        <i class="fa-solid fa-circle-info mr-1"></i> <b>Scan Biasa (Khusus Tahfidz & Setoran):</b> Pagi & Sore, bisa absen saja, Ziyadah, Murojaah, atau Imtihan secara lengkap.
+                        <i class="fa-solid fa-circle-info mr-1"></i> <b>Scan Biasa (Tahfidz & Ujian Tasmi' 3 Bulanan):</b> Pilih Ziyadah, Murojaah, atau Ujian Tasmi' (lengkap dengan nilai, tajwid, dan makhroj).
                     </div>
 
                     <div class="py-2">
@@ -1051,7 +1080,7 @@
                             </select>
                         </div>
 
-                        <!-- SUBFORM TAHFIDZ -->
+                        <!-- SUBFORM TAHFIDZ & UJIAN TASMI' -->
                         <div id="subform-tahfidz-group" class="space-y-3">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <div>
@@ -1060,7 +1089,7 @@
                                         <option value="Hadir Saja (Absen)">Hadir Saja (Hanya Absen Kehadiran)</option>
                                         <option value="Ziyadah (Hafalan Baru)">Ziyadah (Setor Hafalan Baru)</option>
                                         <option value="Murojaah (Pengulangan)">Murojaah (Setor Pengulangan)</option>
-                                        <option value="Imtihan (Ujian Tasmi')">Imtihan (Ujian Tasmi' / 1 Surat)</option>
+                                        <option value="Ujian Tasmi' (3 Bulanan)">Ujian Tasmi' (Ujian 3 Bulanan)</option>
                                     </select>
                                 </div>
                                 <div id="div-kelancaran-tahfidz">
@@ -1073,6 +1102,7 @@
                                 </div>
                             </div>
 
+                            <!-- Form Ziyadah -->
                             <div id="tahfidz-ziyadah-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-2 hidden">
                                 <div>
                                     <label class="block text-[11px] font-bold text-primary-brown mb-1">Nama Surat / Juz</label>
@@ -1084,6 +1114,7 @@
                                 </div>
                             </div>
 
+                            <!-- Form Murojaah -->
                             <div id="tahfidz-murojaah-fields" class="space-y-2 hidden">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <div>
@@ -1100,6 +1131,29 @@
                                     <input type="text" id="scan-murojaah-ayat" placeholder="Selesai / Ayat 1-40" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
                                 </div>
                             </div>
+
+                            <!-- Form Khusus Ujian Tasmi' 3 Bulanan -->
+                            <div id="tahfidz-tasmi-fields" class="space-y-2.5 hidden bg-white p-3 rounded-xl border border-indigo-200">
+                                <span class="text-[11px] font-bold text-indigo-900 block"><i class="fa-solid fa-award mr-1"></i> Form Penilaian Ujian Tasmi' (3 Bulanan)</span>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-primary-brown mb-1">Nama Surat yang Diujikan</label>
+                                    <input type="text" id="scan-tasmi-surat" placeholder="Contoh: Juz 30 / Surat Al-Baqarah 1-100" class="w-full text-xs px-2.5 py-2 rounded-lg border border-cream bg-white">
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-rose-800 mb-1">Salah Tajwid</label>
+                                        <input type="text" id="scan-tasmi-salah-tajwid" placeholder="Jumlah / Catatan" class="w-full text-xs px-2.5 py-2 rounded-lg border border-rose-200 bg-rose-50/50">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-amber-800 mb-1">Salah Makhroj & Sifat</label>
+                                        <input type="text" id="scan-tasmi-salah-makhroj" placeholder="Jumlah / Catatan" class="w-full text-xs px-2.5 py-2 rounded-lg border border-amber-200 bg-amber-50/50">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-emerald-800 mb-1">Nilai Akhir (Angka/Huruf)</label>
+                                        <input type="text" id="scan-tasmi-nilai" placeholder="Contoh: 95 (Mumtaz)" class="w-full text-xs px-2.5 py-2 rounded-lg border border-emerald-200 bg-emerald-50/50 font-bold">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="flex gap-2 pt-2">
@@ -1114,7 +1168,6 @@
 
         <!-- 4. MENU PANEL PENGURUS -->
         <section id="menu-keterangan" class="space-y-6 hidden">
-            <!-- Tombol Peran Tanpa Menampilkan PIN di Luar -->
             <div id="role-select-box" class="bg-white rounded-2xl p-6 border border-cream shadow-sm space-y-4 max-w-md mx-auto text-center">
                 <div class="w-12 h-12 bg-primary-brown text-white rounded-full flex items-center justify-center mx-auto text-lg font-bold">
                     <i class="fa-solid fa-shield-halved"></i>
@@ -1199,13 +1252,12 @@
                     <p class="text-[10px] text-gray-500 text-center">Status Sesi Cepat Aktif: <b id="text-status-sesi-aktif" class="text-emerald-700">-</b></p>
                 </div>
 
-                <!-- KOREKSI KEGIATAN / UZDUR / HAPUS -->
+                <!-- KOREKSI KEGIATAN -->
                 <div class="space-y-3 bg-purple-50 p-4 rounded-xl border border-purple-200">
                     <div class="flex justify-between items-center">
                         <h4 class="font-bold text-xs text-purple-950"><i class="fa-solid fa-person-walking-arrow-right mr-1"></i> Koreksi Kegiatan, Edit, Uzur & Hapus Catatan</h4>
                         <input type="text" id="search-hapus-kegiatan" onkeyup="filterHapusKegiatan()" placeholder="Cari santri/kegiatan..." class="text-xs px-3 py-1.5 rounded-lg border border-purple-300 bg-white focus:outline-none w-44">
                     </div>
-                    <p class="text-[11px] text-purple-900">Ubah kegiatan jika salah pilih, jadikan <b>Udzur</b>, atau hapus catatan absensi sewaktu-waktu.</p>
                     <div id="list-hapus-kegiatan-container" class="space-y-2 max-h-56 overflow-y-auto"></div>
                 </div>
 
@@ -1346,6 +1398,21 @@
 
     </main>
 
+    <!-- MODAL DETAIL UJIAN TASMI' (KLIK NAMA SURAT) -->
+    <div id="modal-detail-tasmi" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-md rounded-2xl p-5 border border-indigo-200 shadow-xl space-y-4">
+            <div class="flex justify-between items-center border-b border-cream pb-3">
+                <h3 class="font-bold text-base text-indigo-950 flex items-center gap-2">
+                    <i class="fa-solid fa-award text-indigo-700"></i> Rincian Ujian Tasmi' 3 Bulanan
+                </h3>
+                <button onclick="tutupModalDetailTasmi()" class="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded-lg font-bold hover:bg-gray-300">Tutup</button>
+            </div>
+            <div id="modal-tasmi-content" class="space-y-3 text-xs">
+                <!-- Diisi via JavaScript -->
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL EDIT DATA SANTRI -->
     <div id="modal-edit-santri" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white w-full max-w-md rounded-2xl p-5 border border-cream shadow-xl space-y-4">
@@ -1415,7 +1482,7 @@
         </div>
     </div>
 
-    <!-- MODAL EDIT KEGIATAN / KOREKSI OLEH MUSRIF -->
+    <!-- MODAL EDIT KEGIATAN -->
     <div id="modal-edit-kegiatan" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white w-full max-w-md rounded-2xl p-5 border border-cream shadow-xl space-y-4">
             <div class="flex justify-between items-center border-b border-cream pb-3">
@@ -1664,6 +1731,44 @@
             document.getElementById('santri-detail-view').classList.add('hidden');
             document.getElementById('santri-list-view').classList.remove('hidden');
             currentOpenSantriName = "";
+        }
+
+        function bukaDetailTasmiModal(dataObj) {
+            const modal = document.getElementById('modal-detail-tasmi');
+            const content = document.getElementById('modal-tasmi-content');
+            modal.classList.remove('hidden');
+
+            content.innerHTML = `
+                <div class="p-3 bg-indigo-50 rounded-xl border border-indigo-200 space-y-2">
+                    <div>
+                        <span class="text-[10px] text-indigo-700 font-bold uppercase block">Surat / Bagian Diujikan</span>
+                        <span class="text-sm font-bold text-indigo-950">${dataObj.surat || '-'}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-1 border-t border-indigo-200">
+                        <div class="p-2 bg-white rounded-lg border border-indigo-100">
+                            <span class="text-[10px] text-rose-800 font-bold block">Salah Tajwid</span>
+                            <span class="font-bold text-xs text-gray-800">${dataObj.salahTajwid || '0'}</span>
+                        </div>
+                        <div class="p-2 bg-white rounded-lg border border-indigo-100">
+                            <span class="text-[10px] text-amber-800 font-bold block">Salah Makhroj & Sifat</span>
+                            <span class="font-bold text-xs text-gray-800">${dataObj.salahMakhroj || '0'}</span>
+                        </div>
+                    </div>
+                    <div class="p-2 bg-white rounded-lg border border-indigo-100 flex justify-between items-center">
+                        <span class="text-xs font-bold text-emerald-900">Nilai Akhir Ujian:</span>
+                        <span class="text-xs font-bold px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg">${dataObj.nilaiTasmi || '-'}</span>
+                    </div>
+                    <div class="p-2 bg-white rounded-lg border border-indigo-100 flex justify-between items-center">
+                        <span class="text-xs font-bold text-gray-700">Kelancaran:</span>
+                        <span class="text-xs font-bold text-gray-800">${dataObj.status || '-'}</span>
+                    </div>
+                    <span class="text-[9px] text-gray-400 block text-right">Waktu Ujian: ${dataObj.waktuUpdate || dataObj.tanggalStr || '-'}</span>
+                </div>
+            `;
+        }
+
+        function tutupModalDetailTasmi() {
+            document.getElementById('modal-detail-tasmi').classList.add('hidden');
         }
 
         function bukaModalTotalSantri() {
@@ -1977,29 +2082,23 @@
             const jenis = document.getElementById('scan-tahfidz-jenis').value;
             const fieldZiyadah = document.getElementById('tahfidz-ziyadah-fields');
             const fieldMurojaah = document.getElementById('tahfidz-murojaah-fields');
+            const fieldTasmi = document.getElementById('tahfidz-tasmi-fields');
             const divKelancaran = document.getElementById('div-kelancaran-tahfidz');
-            const labelSuratDari = document.getElementById('label-surat-dari');
-            const divSuratSampai = document.getElementById('div-surat-sampai');
+
+            fieldZiyadah.classList.add('hidden');
+            fieldMurojaah.classList.add('hidden');
+            fieldTasmi.classList.add('hidden');
 
             if (jenis.includes('Hadir')) {
-                fieldZiyadah.classList.add('hidden');
-                fieldMurojaah.classList.add('hidden');
                 divKelancaran.classList.add('hidden');
             } else {
                 divKelancaran.classList.remove('hidden');
                 if (jenis.includes('Ziyadah')) {
                     fieldZiyadah.classList.remove('hidden');
-                    fieldMurojaah.classList.add('hidden');
-                } else if (jenis.includes('Imtihan')) {
-                    fieldZiyadah.classList.add('hidden');
-                    fieldMurojaah.classList.remove('hidden');
-                    labelSuratDari.innerText = "Nama Surat / Ujian";
-                    divSuratSampai.classList.add('hidden');
+                } else if (jenis.includes('Ujian Tasmi')) {
+                    fieldTasmi.classList.remove('hidden');
                 } else {
-                    fieldZiyadah.classList.add('hidden');
                     fieldMurojaah.classList.remove('hidden');
-                    labelSuratDari.innerText = "Dari Surat Awal";
-                    divSuratSampai.classList.remove('hidden');
                 }
             }
         }
@@ -2080,15 +2179,20 @@
                     }
                     payload.surat = surat;
                     payload.ayat = ayat || "Selesai";
-                } else if (jenisSetoran.includes('Imtihan')) {
-                    const suratUjian = document.getElementById('scan-murojaah-dari').value.trim();
-                    const ayatUjian = document.getElementById('scan-murojaah-ayat').value.trim();
-                    if (!suratUjian) {
-                        alert("Mohon isi nama surat ujian terlebih dahulu!");
+                } else if (jenisSetoran.includes('Ujian Tasmi')) {
+                    const suratTasmi = document.getElementById('scan-tasmi-surat').value.trim();
+                    const salahTajwid = document.getElementById('scan-tasmi-salah-tajwid').value.trim();
+                    const salahMakhroj = document.getElementById('scan-tasmi-salah-makhroj').value.trim();
+                    const nilaiTasmi = document.getElementById('scan-tasmi-nilai').value.trim();
+
+                    if (!suratTasmi) {
+                        alert("Mohon isi Nama Surat yang diujikan!");
                         return;
                     }
-                    payload.surat = `Imtihan: Surat ${suratUjian}`;
-                    payload.ayat = ayatUjian || "Selesai";
+                    payload.surat = `Ujian Tasmi': ${suratTasmi}`;
+                    payload.salahTajwid = salahTajwid || "0";
+                    payload.salahMakhroj = salahMakhroj || "0";
+                    payload.nilaiTasmi = nilaiTasmi || "-";
                 } else {
                     const dariSurat = document.getElementById('scan-murojaah-dari').value.trim();
                     const sampaiSurat = document.getElementById('scan-murojaah-sampai').value.trim();
@@ -2097,7 +2201,7 @@
                         alert("Mohon isi rentang Surat Awal dan Surat Akhir terlebih dahulu!");
                         return;
                     }
-                    payload.surat = `Dari Surat ${dariSurat} s/d ${sampaiSurat}`;
+                    payload.surat = `Murojaah: Dari Surat ${dariSurat} s/d ${sampaiSurat}`;
                     payload.ayat = ayatMurojaah || "Selesai";
                 }
             }
@@ -2161,7 +2265,7 @@
                             alertMsg.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-700 text-2xl mr-2"></i><span class="text-lg">BERHASIL DISIMPAN</span><br><span class="text-xs font-normal">${decodedText} • ${sesiAktif}</span>`;
                         } else {
                             alertBox.className = "p-5 rounded-2xl border bg-amber-100 border-amber-400 text-amber-900 text-center transition-all shadow-md";
-                            alertMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-700 text-2xl mr-2"></i><span class="text-lg">${res.status === "error" ? "GAGAL" : "ANDA TELAH ABSEN"}</span><br><span class="text-xs font-normal">${res.pesan}</span>`;
+                            alertMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-700 text-2xl mr-2"></i><span class="text-lg">GAGAL</span><br><span class="text-xs font-normal">${res.pesan}</span>`;
                         }
 
                         setTimeout(() => {
